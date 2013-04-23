@@ -169,8 +169,8 @@ class Main extends ApplicationListener {
     })
 
     // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
-    // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC. A lot of
-    //  collisions should be culled though due to not doing static-to-static collision.
+    // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC/etc. A lot of
+    //  collisions should be culled though due to not doing static-to-static collision, ignoring NONE, etc..
     val colliding = new GdxArray[Vector2]
     val collidingType = new GdxArray[Int]
     for (i <- 0 to entities.size - 1) {
@@ -194,20 +194,65 @@ class Main extends ApplicationListener {
               val left2 = rect2.getX
               val right2 = rect2.getWidth
 
-              if (bottom1 < top2) {
-                if (right1 > left2) {
-                  val topBottom = top2 - bottom1
-                  val rightLeft = left2 - right1
-                  if (topBottom < rightLeft) {
-                    colliding.add(new Vector2(rightLeft, 0))
-                    collidingType.add(ent2.collisionType)
+              val topBottom = top2 - bottom1
+              val bottomTop = top1 - bottom2
+              val rightLeft = right1 - left2
+              val leftRight = right2 - left1
+              val topBottomAbs = Math.abs(topBottom)
+              val bottomTopAbs = Math.abs(bottomTop)
+              val rightLeftAbs = Math.abs(rightLeft)
+              val leftRightAbs = Math.abs(leftRight)
+
+              if (bottomTopAbs < topBottomAbs) {
+                if (leftRightAbs < rightLeftAbs) {
+                  if (bottomTopAbs < leftRightAbs) {
+                    colliding.add(new Vector2(0, bottomTop))
                   }
                   else {
-                    colliding.add(new Vector2(0, topBottom))
-                    collidingType.add(ent2.collisionType)
+                    colliding.add(new Vector2(leftRight, 0))
+                  }
+                }
+                else {
+                  if (bottomTopAbs < rightLeftAbs) {
+                    colliding.add(new Vector2(0, bottomTop))
+                  }
+                  else {
+                    colliding.add(new Vector2(rightLeft, 0))
                   }
                 }
               }
+              else {
+                if (leftRightAbs < rightLeftAbs) {
+                  if (topBottomAbs < leftRightAbs) {
+                    colliding.add(new Vector2(0, topBottom))
+                  }
+                  else {
+                    colliding.add(new Vector2(leftRight, 0))
+                  }
+                }
+                else {
+                  if (topBottomAbs < rightLeftAbs) {
+                    colliding.add(new Vector2(0, topBottom))
+                  }
+                  else {
+                    colliding.add(new Vector2(rightLeft, 0))
+                  }
+                }
+              }
+              collidingType.add(ent2.collisionType)
+
+              //              if (bottom1 < top2) {
+              //                if (right1 > left2) {
+              //                  if (Math.abs(topBottom) < Math.abs(rightLeft)) {
+              //                    colliding.add(new Vector2(0, topBottom))
+              //                    collidingType.add(ent2.collisionType)
+              //                  }
+              //                  else {
+              //                    colliding.add(new Vector2(rightLeft, 0))
+              //                    collidingType.add(ent2.collisionType)
+              //                  }
+              //                }
+              //              }
             }
           }
         }
@@ -364,6 +409,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
     }
     if (y > 0) {
       jumping = false
+      velocity.y = 0
     }
     move(x, y)
   }
