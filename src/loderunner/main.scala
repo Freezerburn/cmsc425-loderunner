@@ -1,7 +1,7 @@
 package loderunner
 
-import com.badlogic.gdx.{InputProcessor, Gdx, ApplicationListener}
-import com.badlogic.gdx.graphics.{GL10, OrthographicCamera}
+import com.badlogic.gdx._
+import com.badlogic.gdx.graphics.{Color, GL10, OrthographicCamera}
 import com.badlogic.gdx.math.{Vector2, Rectangle}
 import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.utils.{Array => GdxArray}
@@ -62,8 +62,13 @@ class Main extends ApplicationListener {
 
   var renderer: ShapeRenderer = null
   val entities: GdxArray[Entity] = new GdxArray[Entity]()
+  val removeLater: GdxArray[Entity] = new GdxArray[Entity]()
+  val addLater: GdxArray[Entity] = new GdxArray[Entity]()
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
+
+  var score: Long = 0L
+  var scoreMultiplier: Float = 1.0f
 
   def create() {
     log("Creating game")
@@ -86,6 +91,9 @@ class Main extends ApplicationListener {
     }
     entities.add(new StaticBlock(width / 10.0f * 5, 50, width / 10.0f, 20))
     entities.add(new StaticBlock(width / 10.0f * 4, 90, width / 10.0f, 20))
+
+    log("Creating treasure")
+    entities.add(new Treasure(150, 100))
 
     log("Making the player")
     entities.add(new Player(0, 80))
@@ -178,14 +186,14 @@ class Main extends ApplicationListener {
     for (i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
       colliding.clear()
-      if (ent.collisionType == Entity.COLLISION_DYNAMIC) {
+      //      if (ent.collisionType == Entity.COLLISION_DYNAMIC) {
+      if (ent.collisionType != Entity.COLLISION_STATIC && ent.collisionType != Entity.COLLISION_NONE) {
         for (j <- 0 to entities.size - 1) {
           val ent2 = entities.get(j)
           if (ent2 != ent && ent2.collisionType != Entity.COLLISION_NONE) {
             val rect = ent.rectangle()
             val rect2 = ent2.rectangle()
             if (rect.overlaps(rect2)) {
-              //              log("Overlaps passed: " + ent + ", " + ent2)
               val bottom1 = rect.getY
               val top1 = bottom1 + rect.getHeight
               val left1 = rect.getX
@@ -197,9 +205,7 @@ class Main extends ApplicationListener {
               val right2 = left2 + rect2.getWidth
 
               val topBottom = top2 - bottom1
-              //              val bottomTop = top1 - bottom2
               val bottomTop = bottom2 - top1
-              //              val rightLeft = right1 - left2
               val rightLeft = left2 - right1
               val leftRight = right2 - left1
               val topBottomAbs = Math.abs(topBottom)
@@ -244,19 +250,6 @@ class Main extends ApplicationListener {
                 }
               }
               collidingType.add(ent2.collisionType)
-
-              //              if (bottom1 < top2) {
-              //                if (right1 > left2) {
-              //                  if (Math.abs(topBottom) < Math.abs(rightLeft)) {
-              //                    colliding.add(new Vector2(0, topBottom))
-              //                    collidingType.add(ent2.collisionType)
-              //                  }
-              //                  else {
-              //                    colliding.add(new Vector2(rightLeft, 0))
-              //                    collidingType.add(ent2.collisionType)
-              //                  }
-              //                }
-              //              }
             }
           }
         }
@@ -266,11 +259,31 @@ class Main extends ApplicationListener {
       }
     }
 
+    for (i <- 0 to removeLater.size - 1) {
+      entities.removeValue(removeLater.get(i), true)
+    }
+    removeLater.clear()
+    for (i <- 0 to addLater.size - 1) {
+      entities.add(addLater.get(i))
+    }
+    addLater.clear()
+
     if (Main.DEBUG) {
       renderer.begin(ShapeRenderer.ShapeType.Rectangle)
       entities.iterator().foreach((ent) => {
         val pos = ent.position()
         val size = ent.size()
+        ent.collisionType match {
+          case Entity.COLLISION_DYNAMIC => {
+            renderer.setColor(Color.RED)
+          }
+          case Entity.COLLISION_TREASURE => {
+            renderer.setColor(Color.YELLOW)
+          }
+          case _ => {
+            renderer.setColor(Color.WHITE)
+          }
+        }
         renderer.rect(pos.x, pos.y, size.x, size.y)
       })
       renderer.end()
@@ -285,6 +298,11 @@ class Main extends ApplicationListener {
 
   def dispose() {
   }
+
+  def addScore(score: Long) {
+    this.score += Math.round(score * scoreMultiplier)
+    log("Added %d score to get %d total (x%.2f)".format(score, this.score, this.scoreMultiplier))
+  }
 }
 
 object Entity {
@@ -298,6 +316,8 @@ object Entity {
 
 trait Entity {
   def update(dt: Float)
+
+  def destroy()
 
   def key(keyCode: Int, pressed: Boolean): Boolean
 
@@ -403,13 +423,25 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
     var y = Float.MaxValue
     for (i <- 0 to collisions.size - 1) {
       val vec = collisions.get(i)
-      if (vec.x != 0 && Math.abs(vec.x) < Math.abs(x)) {
-        x = vec.x
-      }
-      if (vec.y != 0 && Math.abs(vec.y) < Math.abs(y)) {
-        y = vec.y
+      val colType = collisionTypes.get(i)
+      colType match {
+        case Entity.COLLISION_STATIC => {
+          if (vec.x != 0 && Math.abs(vec.x) < Math.abs(x)) {
+            x = vec.x
+          }
+          if (vec.y != 0 && Math.abs(vec.y) < Math.abs(y)) {
+            y = vec.y
+          }
+        }
+        case Entity.COLLISION_TREASURE => {
+          log("Collided with treasure")
+          val foo = Main.instance.entities.indexOf(this, true)
+          log("Player has index: " + foo)
+        }
+        case _ => Unit
       }
     }
+
     if (x == Float.MaxValue) {
       x = 0
     }
@@ -422,8 +454,11 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         velocity.y = 0
       }
     }
+
     move(x, y)
   }
+
+  def destroy() {}
 }
 
 class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entity with MovingEntity {
@@ -443,4 +478,48 @@ class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entit
   def collisionType: Int = Entity.COLLISION_STATIC
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {}
+
+  def destroy() {}
+}
+
+object Treasure {
+  val WIDTH = 20.0f
+  val HEIGHT = 20.0f
+  val SCORE = 100L
+}
+
+class Treasure(x: Float, y: Float) extends Entity {
+  val pos = new Vector2(x, y)
+
+  def update(dt: Float) {}
+
+  def key(keyCode: Int, pressed: Boolean): Boolean = false
+
+  def position(): Vector2 = new Vector2(pos)
+
+  def size(): Vector2 = new Vector2(Treasure.WIDTH, Treasure.HEIGHT)
+
+  def rectangle(): Rectangle = new Rectangle(pos.x, pos.y, Treasure.WIDTH, Treasure.HEIGHT)
+
+  def collisionType: Int = Entity.COLLISION_TREASURE
+
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int]) {
+    for (i <- 0 to collisions.size - 1) {
+      val colType = collisionTypes.get(i)
+      colType match {
+        case Entity.COLLISION_DYNAMIC => {
+          //          this.destroy()
+          //          val foo = Main.instance.entities.indexOf(this, true)
+          //          Utils.log("Treasure has index: " + foo)
+          Main.instance.addScore(Treasure.SCORE)
+          Main.instance.removeLater.add(this)
+        }
+        case _ => Unit
+      }
+    }
+  }
+
+  def destroy() {
+    //    Main.instance.entities.removeValue(this, true)
+  }
 }
