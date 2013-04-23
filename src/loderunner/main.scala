@@ -84,7 +84,8 @@ class Main extends ApplicationListener {
     for (i <- 0 to (width / 10).asInstanceOf[Int]) {
       entities.add(new StaticBlock(width / 10.0f * i, 20, width / 10.0f, 20))
     }
-    entities.add(new StaticBlock(width / 10.0f * 5 - 10.0f, 50, width / 10.0f, 20))
+    entities.add(new StaticBlock(width / 10.0f * 5, 50, width / 10.0f, 20))
+    entities.add(new StaticBlock(width / 10.0f * 4, 90, width / 10.0f, 20))
 
     log("Making the player")
     entities.add(new Player(0, 80))
@@ -398,7 +399,6 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   def collisionType: Int = Entity.COLLISION_DYNAMIC
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {
-    //    log("Collision: " + collisions)
     var x = Float.MaxValue
     var y = Float.MaxValue
     for (i <- 0 to collisions.size - 1) {
@@ -410,12 +410,19 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         y = vec.y
       }
     }
-    if (y > 0) {
-      jumping = false
-      velocity.y = 0
+    if (x == Float.MaxValue) {
+      x = 0
     }
-    log("Moving: " + x + ", " + y)
-    move(if (x == Float.MaxValue) 0 else x, if (y == Float.MaxValue) 0 else y)
+    if (y == Float.MaxValue) {
+      y = 0
+    }
+    if (y > 0) {
+      if (velocity.y < 0) {
+        jumping = false
+        velocity.y = 0
+      }
+    }
+    move(x, y)
   }
 }
 
