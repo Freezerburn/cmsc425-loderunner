@@ -2,13 +2,12 @@ package loderunner
 
 import com.badlogic.gdx.{InputProcessor, Gdx, ApplicationListener}
 import com.badlogic.gdx.graphics.{GL10, OrthographicCamera}
-import com.badlogic.gdx.physics.box2d._
-import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.math.{Vector2, Rectangle}
 import com.badlogic.gdx.utils.GdxNativesLoader
-import com.badlogic.gdx.physics.box2d.BodyDef.BodyType
 import com.badlogic.gdx.utils.{Array => GdxArray}
 
 import scala.collection.JavaConversions._
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,6 +17,7 @@ import scala.collection.JavaConversions._
  */
 
 object Main {
+
   import loderunner.Utils._
 
   val WIDTH = 640
@@ -26,25 +26,31 @@ object Main {
   val WORLD_TO_BOX = 0.01f
   val BOX_TO_WORLD = 100.0f
 
-  def boxToWorld(value: Float):Float = {
+  val DEBUG = true
+
+  def boxToWorld(value: Float): Float = {
     value * BOX_TO_WORLD
   }
 
-  def worldToBox(value: Float):Float = {
+  def worldToBox(value: Float): Float = {
     value * WORLD_TO_BOX
   }
 
   var instance: Main = null
+
   def main(args: Array[String]) {
     GdxNativesLoader.load()
     instance = new Main
     newGame(instance, WIDTH, HEIGHT)
   }
 }
+
 class Main extends ApplicationListener {
+
   import Utils._
   import Gdx.gl
   import GL10._
+
   var width = Main.WIDTH
   var height = Main.HEIGHT
   var camera: OrthographicCamera = null
@@ -53,12 +59,8 @@ class Main extends ApplicationListener {
   val worldStep = 1 / 60.0f
   val worldVelocitySteps = 6
   val worldPositionSteps = 2
-  val world = new World(worldGravity, true)
-  var renderer: Box2DDebugRenderer = null
 
-  val bodies: GdxArray[StaticBox] = new GdxArray[StaticBox]()
-  var circle: DynamicCircle = null
-  var box: DynamicBox = null
+  var renderer: ShapeRenderer = null
   val entities: GdxArray[Entity] = new GdxArray[Entity]()
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
@@ -69,40 +71,22 @@ class Main extends ApplicationListener {
     camera = new OrthographicCamera()
     camera.viewportHeight = width
     camera.viewportWidth = height
-    camera.zoom = Main.WORLD_TO_BOX
-//    camera.zoom = 0.5f
+    //    camera.zoom = Main.WORLD_TO_BOX
+    //    camera.zoom = 0.5f
     camera.update()
 
-    renderer = new Box2DDebugRenderer()
+    renderer = new ShapeRenderer()
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
 
-    log("Creating some physics objects")
-//    log("Making body: " + (0, 0, 20, 20))
-//    bodies.add(new StaticBox(0, 0, 20, 20))
-
-    log("Making body: " + (40, -60, 70, 20))
-    bodies.add(new StaticBox(40, -60, 70, 20))
-    log("Body 2 position: " + bodies.get(0).position)
-
-    log("Making body: " + (-90, -160, 70, 20))
-    bodies.add(new StaticBox(-90, -160, 70, 20))
-    log("Body 3 position: " + bodies.get(1).position)
-
-    log("Making body: " + (-90, -160, 70, 20))
-    bodies.add(new StaticBox(0, -260, 800, 20))
-    log("Body 3 position: " + bodies.get(2).position)
-
-//    log("Making dynamic circle")
-//    circle = new DynamicCircle(0, 40, 10)
-//    circle.body.applyForceToCenter(Main.worldToBox(20), 0)
-
-//    log("Making dynamic box")
-//    box = new DynamicBox(0, 40, 10, 10)
+    log("Creating some static blocks")
+    for (i <- 0 to (width / 10).asInstanceOf[Int]) {
+      entities.add(new StaticBlock(width / 10.0f * i, 20, width / 10.0f, 20))
+    }
 
     log("Making the player")
-    entities.add(new Player(0, 40))
+    entities.add(new Player(0, 80))
 
     log("Setting input listener to custom one")
     val force = 180
@@ -124,10 +108,10 @@ class Main extends ApplicationListener {
             true
           }
           case _ => {
-            log("Unhandled key, checking entities. KEY=" + keycode)
+            //            log("Unhandled key, checking entities. KEY=" + keycode)
             entities.iterator().foldLeft(false)((accum, ent) => {
-              log("Sending keycode to: " + ent)
-              if(ent.keyDown(keycode)) {
+              //              log("Sending keycode to: " + ent)
+              if (ent.key(keycode, true)) {
                 return true
               }
               false
@@ -143,10 +127,10 @@ class Main extends ApplicationListener {
       def keyUp(keycode: Int): Boolean = {
         keycode match {
           case _ => {
-            log("Unhandled key, checking entities. KEY=" + keycode)
+            //            log("Unhandled key, checking entities. KEY=" + keycode)
             entities.iterator().foldLeft(false)((accum, ent) => {
-              log("Sending keycode to: " + ent)
-              if(ent.keyUp(keycode)) {
+              //              log("Sending keycode to: " + ent)
+              if (ent.key(keycode, false)) {
                 return true
               }
               false
@@ -174,17 +158,74 @@ class Main extends ApplicationListener {
     this.height = height
     camera.viewportHeight = width
     camera.viewportWidth = height
-//    camera.zoom = Main.BOX_TO_WORLD
+    //    camera.zoom = Main.BOX_TO_WORLD
     camera.update()
   }
 
   def render() {
     gl.glClear(GL_COLOR_BUFFER_BIT)
-    renderer.render(world, camera.combined)
     entities.iterator().foreach((ent) => {
       ent.update(worldStep)
     })
-    world.step(worldStep, worldVelocitySteps, worldPositionSteps)
+
+    // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
+    // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC. A lot of
+    //  collisions should be culled though due to not doing static-to-static collision.
+    val colliding = new GdxArray[Vector2]
+    val collidingType = new GdxArray[Int]
+    for (i <- 0 to entities.size - 1) {
+      val ent = entities.get(i)
+      colliding.clear()
+      if (ent.collisionType == Entity.COLLISION_DYNAMIC) {
+        for (j <- 0 to entities.size - 1) {
+          val ent2 = entities.get(j)
+          if (ent2 != ent && ent2.collisionType != Entity.COLLISION_NONE) {
+            val rect = ent.rectangle()
+            val rect2 = ent2.rectangle()
+            if (rect.overlaps(rect2)) {
+              //              log("Overlaps passed: " + ent + ", " + ent2)
+              val bottom1 = rect.getY
+              val top1 = bottom1 + rect.getHeight
+              val left1 = rect.getX
+              val right1 = left1 + rect.getWidth
+
+              val bottom2 = rect2.getY
+              val top2 = bottom2 + rect2.getHeight
+              val left2 = rect2.getX
+              val right2 = rect2.getWidth
+
+              if (bottom1 < top2) {
+                if (right1 > left2) {
+                  val topBottom = top2 - bottom1
+                  val rightLeft = left2 - right1
+                  if (topBottom < rightLeft) {
+                    colliding.add(new Vector2(rightLeft, 0))
+                    collidingType.add(ent2.collisionType)
+                  }
+                  else {
+                    colliding.add(new Vector2(0, topBottom))
+                    collidingType.add(ent2.collisionType)
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      if (colliding.size > 0) {
+        ent.onCollision(colliding, collidingType)
+      }
+    }
+
+    if (Main.DEBUG) {
+      renderer.begin(ShapeRenderer.ShapeType.Rectangle)
+      entities.iterator().foreach((ent) => {
+        val pos = ent.position()
+        val size = ent.size()
+        renderer.rect(pos.x, pos.y, size.x, size.y)
+      })
+      renderer.end()
+    }
   }
 
   def pause() {
@@ -194,145 +235,155 @@ class Main extends ApplicationListener {
   }
 
   def dispose() {
-    world.dispose()
   }
+}
+
+object Entity {
+  val COLLISION_NONE: Int = 0
+  val COLLISION_STATIC: Int = 1
+  val COLLISION_DYNAMIC: Int = 2
+  val COLLISION_TREASURE: Int = 3
+  val COLLISION_LADDER: Int = 4
+  val COLLISION_ENEMY: Int = 5
 }
 
 trait Entity {
   def update(dt: Float)
-  def keyDown(keyCode: Int):Boolean
-  def keyUp(keyCode: Int):Boolean
+
+  def key(keyCode: Int, pressed: Boolean): Boolean
+
+  def position(): Vector2
+
+  def size(): Vector2
+
+  def rectangle(): Rectangle
+
+  def collisionType: Int
+
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int])
 }
 
-class Player(x: Float, y: Float) extends Entity {
+trait MovingEntity {
+  val rect: Rectangle
+  val accelerationScale: Float
+  val velocity: Vector2 = new Vector2
+  val acceleration: Vector2 = new Vector2
+
+  def move(x: Float, y: Float) {
+    rect.setX(rect.getX + x)
+    rect.setY(rect.getY + y)
+  }
+
+  def updateMove(dt: Float) {
+    velocity.add(acceleration.x * dt * accelerationScale, acceleration.y * dt * accelerationScale)
+    move(velocity.x * dt, velocity.y * dt)
+  }
+}
+
+class Player(x: Float, y: Float) extends Entity with MovingEntity {
+
   import Utils.log
-  private val width = 10.0f
-  private val height = 20.0f
-  private val force = new Vector2()
-  private val FORCE = 100.0f
 
-  private val bodyDef = new BodyDef
-  bodyDef.`type` = BodyType.DynamicBody
-  bodyDef.position.set(Main.worldToBox(x), Main.worldToBox(y))
-  bodyDef.fixedRotation = true
-  val body = Main.instance.world.createBody(bodyDef)
+  val VEL: Float = 100.0f
+  val JUMP_VEL: Float = 290.0f
+  var jumping = false
+  val rect = new Rectangle(x, y, 20.0f, 40.0f)
+  acceleration.y = -9.81f * 70.0f
+  val accelerationScale: Float = 1
 
-  private var box = new PolygonShape()
-  box.setAsBox(Main.worldToBox(width), Main.worldToBox(height))
-  private val fixtureDef = new FixtureDef
-  fixtureDef.shape = box
-  fixtureDef.density = 1
-  fixtureDef.friction = 0.90f
-  fixtureDef.restitution = 0
-
-  private val fixture = body.createFixture(fixtureDef)
-  box.dispose()
-  box = null
-
-  override def keyDown(keyCode: Int):Boolean = {
+  override def key(keyCode: Int, pressed: Boolean): Boolean = {
     import com.badlogic.gdx.Input.Keys
     keyCode match {
       case Keys.LEFT => {
-        log("Applying force left")
-        body.applyLinearImpulse(Main.worldToBox(-FORCE / 14.0f), 0, 0, 0)
-        force.add(Main.worldToBox(-FORCE), 0)
+        pressed match {
+          case true => {
+            log("Moving left")
+            velocity.x -= VEL
+          }
+          case false => {
+            log("Finished moving left")
+            velocity.x += VEL
+          }
+        }
         true
       }
       case Keys.RIGHT => {
-        log("Applying force right")
-        body.applyLinearImpulse(Main.worldToBox(FORCE / 14.0f), 0, 0, 0)
-        force.add(Main.worldToBox(FORCE), 0)
+        pressed match {
+          case true => {
+            log("Moving right")
+            velocity.x += VEL
+          }
+          case false => {
+            log("Finished moving right")
+            velocity.x -= VEL
+          }
+        }
         true
       }
       case Keys.SPACE => {
-        log("Jumping (single impulse up)")
-        body.applyLinearImpulse(0, Main.worldToBox(20), 0, 0)
-        true
+        if (pressed) {
+          if (!jumping) {
+            log("Jumping")
+            jumping = true
+            velocity.y = JUMP_VEL
+          }
+          true
+        }
+        else {
+          false
+        }
       }
       case _ => false
     }
   }
 
-  override def keyUp(keyCode: Int):Boolean = {
-    import com.badlogic.gdx.Input.Keys
-    keyCode match {
-      case Keys.LEFT => {
-        force.add(Main.worldToBox(FORCE), 0)
-        body.applyLinearImpulse(Main.worldToBox(FORCE) / 10.0f, 0, 0, 0)
-        true
+  override def update(dt: Float) {
+    updateMove(dt)
+  }
+
+  def position(): Vector2 = new Vector2(rect.getX, rect.getY)
+
+  def size(): Vector2 = new Vector2(rect.getWidth, rect.getHeight)
+
+  def rectangle(): Rectangle = new Rectangle(rect)
+
+  def collisionType: Int = Entity.COLLISION_DYNAMIC
+
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {
+    //    log("Collision: " + collisions)
+    var x = Float.MaxValue
+    var y = Float.MaxValue
+    for (i <- 0 to collisions.size - 1) {
+      val vec = collisions.get(i)
+      if (Math.abs(vec.x) < Math.abs(x)) {
+        x = vec.x
       }
-      case Keys.RIGHT => {
-        force.add(Main.worldToBox(-FORCE), 0)
-        body.applyLinearImpulse(Main.worldToBox(-FORCE) / 10.0f, 0, 0, 0)
-        true
+      if (Math.abs(vec.y) < Math.abs(y)) {
+        y = vec.y
       }
-      case _ => false
     }
-  }
-
-  def update(dt: Float) {
-    if(Math.abs(body.getLinearVelocity.x) < Main.worldToBox(200)) {
-      body.applyForceToCenter(force)
+    if (y > 0) {
+      jumping = false
     }
+    move(x, y)
   }
 }
 
-class StaticBox(x: Float, y: Float, width: Float, height: Float) {
-  private val bodyDef = new BodyDef()
-  bodyDef.`type` = BodyType.StaticBody
-  bodyDef.position.set(Main.worldToBox(x), Main.worldToBox(y))
+class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entity with MovingEntity {
+  val rect: Rectangle = new Rectangle(x, y, width, height)
+  val accelerationScale: Float = 0
 
-  val body = Main.instance.world.createBody(bodyDef)
+  def update(dt: Float) {}
 
-  private var box = new PolygonShape()
-  box.setAsBox(Main.worldToBox(width / 2.0f), Main.worldToBox(height / 2.0f))
+  def key(keyCode: Int, pressed: Boolean): Boolean = false
 
-  private val fixture = body.createFixture(box, 0.0f)
-  box.dispose()
-  box = null
+  def position(): Vector2 = new Vector2(rect.getX, rect.getY)
 
-  def position: Vector2 = {
-    body.getPosition.cpy().mul(Main.BOX_TO_WORLD)
-  }
-}
+  def size(): Vector2 = new Vector2(rect.getWidth, rect.getHeight)
 
-class DynamicCircle(x: Float, y: Float, radius: Float) {
-  private val bodyDef = new BodyDef
-  bodyDef.`type` = BodyType.DynamicBody
-  bodyDef.position.set(Main.worldToBox(x), Main.worldToBox(y))
+  def rectangle(): Rectangle = new Rectangle(rect)
 
-  val body = Main.instance.world.createBody(bodyDef)
+  def collisionType: Int = Entity.COLLISION_STATIC
 
-  private var circle = new CircleShape()
-  circle.setRadius(Main.worldToBox(radius))
-
-  private val fixtureDef = new FixtureDef
-  fixtureDef.shape = circle
-  fixtureDef.density = 1
-  fixtureDef.friction = 0.5f
-  fixtureDef.restitution = 0.7f
-
-  private val fixture = body.createFixture(fixtureDef)
-  circle.dispose()
-  circle = null
-}
-
-class DynamicBox(x: Float, y: Float, width: Float, height: Float) {
-  private val bodyDef = new BodyDef
-  bodyDef.`type` = BodyType.DynamicBody
-  bodyDef.position.set(Main.worldToBox(x), Main.worldToBox(y))
-  bodyDef.fixedRotation = true
-  val body = Main.instance.world.createBody(bodyDef)
-
-  private var box = new PolygonShape()
-  box.setAsBox(Main.worldToBox(width), Main.worldToBox(height))
-  private val fixtureDef = new FixtureDef
-  fixtureDef.shape = box
-  fixtureDef.density = 1
-  fixtureDef.friction = 0.90f
-  fixtureDef.restitution = 0
-
-  private val fixture = body.createFixture(fixtureDef)
-  box.dispose()
-  box = null
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {}
 }
