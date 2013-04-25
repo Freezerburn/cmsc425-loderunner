@@ -1,13 +1,14 @@
 package loderunner
 
 import com.badlogic.gdx._
-import com.badlogic.gdx.graphics.{Color, GL10, OrthographicCamera}
+import com.badlogic.gdx.graphics.{Color, OrthographicCamera}
 import com.badlogic.gdx.math.{Vector2, Rectangle}
 import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.utils.{Array => GdxArray}
 
 import scala.collection.JavaConversions._
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
+import com.badlogic.gdx.graphics.g2d.TextureRegion
 
 /**
  * Created with IntelliJ IDEA.
@@ -45,11 +46,10 @@ object Main {
   }
 }
 
-class Main extends ApplicationListener {
+class Main extends Game with ApplicationListener {
 
   import Utils._
   import Gdx.gl
-  import GL10._
 
   var width = Main.WIDTH
   var height = Main.HEIGHT
@@ -57,13 +57,16 @@ class Main extends ApplicationListener {
 
   val worldGravity = new Vector2(0, -10)
   val worldStep = 1 / 60.0f
-  val worldVelocitySteps = 6
-  val worldPositionSteps = 2
 
   var renderer: ShapeRenderer = null
   val entities: GdxArray[Entity] = new GdxArray[Entity]()
   val removeLater: GdxArray[Entity] = new GdxArray[Entity]()
   val addLater: GdxArray[Entity] = new GdxArray[Entity]()
+
+  val levels: GdxArray[Level] = new GdxArray[Level]()
+  levels.add(new LevelDebug)
+  var currentLevelIndex: Int = 0
+  var currentLevel: Level = null
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
 
@@ -76,8 +79,6 @@ class Main extends ApplicationListener {
     camera = new OrthographicCamera()
     camera.viewportHeight = width
     camera.viewportWidth = height
-    //    camera.zoom = Main.WORLD_TO_BOX
-    //    camera.zoom = 0.5f
     camera.update()
 
     renderer = new ShapeRenderer()
@@ -85,218 +86,19 @@ class Main extends ApplicationListener {
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
 
-    log("Creating some static blocks")
-    for (i <- 0 to (width / 10).asInstanceOf[Int]) {
-      entities.add(new StaticBlock(width / 10.0f * i, 20, width / 10.0f, 20))
-    }
-    entities.add(new StaticBlock(width / 10.0f * 5, 50, width / 10.0f, 20))
-    entities.add(new StaticBlock(width / 10.0f * 4, 90, width / 10.0f, 20))
-
-    log("Creating treasure")
-    entities.add(new Treasure(150, 100))
-
-    log("Making the player")
-    entities.add(new Player(0, 80))
-
-    log("Setting input listener to custom one")
-    val force = 180
-    Gdx.input.setInputProcessor(new InputProcessor {
-      def keyTyped(character: Char): Boolean = {
-        false
-      }
-
-      def mouseMoved(screenX: Int, screenY: Int): Boolean = {
-        false
-      }
-
-      def keyDown(keycode: Int): Boolean = {
-        import com.badlogic.gdx.Input.Keys
-        keycode match {
-          case Keys.Q => {
-            log("Q pressed, quitting application")
-            Gdx.app.exit()
-            true
-          }
-          case _ => {
-            //            log("Unhandled key, checking entities. KEY=" + keycode)
-            entities.iterator().foldLeft(false)((accum, ent) => {
-              //              log("Sending keycode to: " + ent)
-              if (ent.key(keycode, true)) {
-                return true
-              }
-              false
-            })
-          }
-        }
-      }
-
-      def touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean = {
-        false
-      }
-
-      def keyUp(keycode: Int): Boolean = {
-        keycode match {
-          case _ => {
-            //            log("Unhandled key, checking entities. KEY=" + keycode)
-            entities.iterator().foldLeft(false)((accum, ent) => {
-              //              log("Sending keycode to: " + ent)
-              if (ent.key(keycode, false)) {
-                return true
-              }
-              false
-            })
-          }
-        }
-      }
-
-      def scrolled(amount: Int): Boolean = {
-        false
-      }
-
-      def touchUp(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean = {
-        false
-      }
-
-      def touchDragged(screenX: Int, screenY: Int, pointer: Int): Boolean = {
-        false
-      }
-    })
+    currentLevel = levels.get(currentLevelIndex)
+    log("Setting current level to level " + currentLevelIndex + ", " + currentLevel)
+    setScreen(currentLevel)
+    Gdx.input.setInputProcessor(currentLevel)
   }
 
-  def resize(width: Int, height: Int) {
+  override def resize(width: Int, height: Int) {
     this.width = width
     this.height = height
     camera.viewportHeight = width
     camera.viewportWidth = height
     //    camera.zoom = Main.BOX_TO_WORLD
     camera.update()
-  }
-
-  def render() {
-    gl.glClear(GL_COLOR_BUFFER_BIT)
-    entities.iterator().foreach((ent) => {
-      ent.update(worldStep)
-    })
-
-    // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
-    // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC/etc. A lot of
-    //  collisions should be culled though due to not doing static-to-static collision, ignoring NONE, etc..
-    val colliding = new GdxArray[Vector2]
-    val collidingType = new GdxArray[Int]
-    for (i <- 0 to entities.size - 1) {
-      val ent = entities.get(i)
-      colliding.clear()
-      //      if (ent.collisionType == Entity.COLLISION_DYNAMIC) {
-      if (ent.collisionType != Entity.COLLISION_STATIC && ent.collisionType != Entity.COLLISION_NONE) {
-        for (j <- 0 to entities.size - 1) {
-          val ent2 = entities.get(j)
-          if (ent2 != ent && ent2.collisionType != Entity.COLLISION_NONE) {
-            val rect = ent.rectangle()
-            val rect2 = ent2.rectangle()
-            if (rect.overlaps(rect2)) {
-              val bottom1 = rect.getY
-              val top1 = bottom1 + rect.getHeight
-              val left1 = rect.getX
-              val right1 = left1 + rect.getWidth
-
-              val bottom2 = rect2.getY
-              val top2 = bottom2 + rect2.getHeight
-              val left2 = rect2.getX
-              val right2 = left2 + rect2.getWidth
-
-              val topBottom = top2 - bottom1
-              val bottomTop = bottom2 - top1
-              val rightLeft = left2 - right1
-              val leftRight = right2 - left1
-              val topBottomAbs = Math.abs(topBottom)
-              val bottomTopAbs = Math.abs(bottomTop)
-              val rightLeftAbs = Math.abs(rightLeft)
-              val leftRightAbs = Math.abs(leftRight)
-
-              if (bottomTopAbs < topBottomAbs) {
-                if (leftRightAbs < rightLeftAbs) {
-                  if (bottomTopAbs < leftRightAbs) {
-                    colliding.add(new Vector2(0, bottomTop))
-                  }
-                  else {
-                    colliding.add(new Vector2(leftRight, 0))
-                  }
-                }
-                else {
-                  if (bottomTopAbs < rightLeftAbs) {
-                    colliding.add(new Vector2(0, bottomTop))
-                  }
-                  else {
-                    colliding.add(new Vector2(rightLeft, 0))
-                  }
-                }
-              }
-              else {
-                if (leftRightAbs < rightLeftAbs) {
-                  if (topBottomAbs < leftRightAbs) {
-                    colliding.add(new Vector2(0, topBottom))
-                  }
-                  else {
-                    colliding.add(new Vector2(leftRight, 0))
-                  }
-                }
-                else {
-                  if (topBottomAbs < rightLeftAbs) {
-                    colliding.add(new Vector2(0, topBottom))
-                  }
-                  else {
-                    colliding.add(new Vector2(rightLeft, 0))
-                  }
-                }
-              }
-              collidingType.add(ent2.collisionType)
-            }
-          }
-        }
-      }
-      if (colliding.size > 0) {
-        ent.onCollision(colliding, collidingType)
-      }
-    }
-
-    for (i <- 0 to removeLater.size - 1) {
-      entities.removeValue(removeLater.get(i), true)
-    }
-    removeLater.clear()
-    for (i <- 0 to addLater.size - 1) {
-      entities.add(addLater.get(i))
-    }
-    addLater.clear()
-
-    if (Main.DEBUG) {
-      renderer.begin(ShapeRenderer.ShapeType.Rectangle)
-      entities.iterator().foreach((ent) => {
-        val pos = ent.position()
-        val size = ent.size()
-        ent.collisionType match {
-          case Entity.COLLISION_DYNAMIC => {
-            renderer.setColor(Color.RED)
-          }
-          case Entity.COLLISION_TREASURE => {
-            renderer.setColor(Color.YELLOW)
-          }
-          case _ => {
-            renderer.setColor(Color.WHITE)
-          }
-        }
-        renderer.rect(pos.x, pos.y, size.x, size.y)
-      })
-      renderer.end()
-    }
-  }
-
-  def pause() {
-  }
-
-  def resume() {
-  }
-
-  def dispose() {
   }
 
   def addScore(score: Long) {
@@ -315,9 +117,16 @@ object Entity {
 }
 
 trait Entity {
+  var isDestroyed = false
+
   def update(dt: Float)
 
-  def destroy()
+  def getSprite: TextureRegion
+
+  def destroy() {
+    Main.instance.currentLevel.removeLater.add(this)
+    isDestroyed = true
+  }
 
   def key(keyCode: Int, pressed: Boolean): Boolean
 
@@ -458,7 +267,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
     move(x, y)
   }
 
-  def destroy() {}
+  def getSprite: TextureRegion = ???
 }
 
 class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entity with MovingEntity {
@@ -479,7 +288,7 @@ class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entit
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {}
 
-  def destroy() {}
+  def getSprite: TextureRegion = ???
 }
 
 object Treasure {
@@ -508,18 +317,244 @@ class Treasure(x: Float, y: Float) extends Entity {
       val colType = collisionTypes.get(i)
       colType match {
         case Entity.COLLISION_DYNAMIC => {
-          //          this.destroy()
-          //          val foo = Main.instance.entities.indexOf(this, true)
-          //          Utils.log("Treasure has index: " + foo)
           Main.instance.addScore(Treasure.SCORE)
-          Main.instance.removeLater.add(this)
+          destroy()
         }
         case _ => Unit
       }
     }
   }
 
-  def destroy() {
-    //    Main.instance.entities.removeValue(this, true)
+  def getSprite: TextureRegion = ???
+}
+
+trait Level extends Screen with InputProcessor {
+  val entities = new GdxArray[Entity]()
+  val addLater = new GdxArray[Entity]()
+  val removeLater = new GdxArray[Entity]()
+
+  def load()
+
+  def isGoalMet: Boolean
+
+  def doCollision() {
+    // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
+    // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC/etc. A lot of
+    //  collisions should be culled though due to not doing static-to-static collision, ignoring NONE, etc..
+    val colliding = new GdxArray[Vector2]
+    val collidingType = new GdxArray[Int]
+    for (i <- 0 to entities.size - 1) {
+      val ent = entities.get(i)
+      colliding.clear()
+      if (ent.collisionType != Entity.COLLISION_STATIC && ent.collisionType != Entity.COLLISION_NONE) {
+        for (j <- 0 to entities.size - 1) {
+          val ent2 = entities.get(j)
+          if (ent2 != ent && ent2.collisionType != Entity.COLLISION_NONE) {
+            val rect = ent.rectangle()
+            val rect2 = ent2.rectangle()
+            if (rect.overlaps(rect2)) {
+              val bottom1 = rect.getY
+              val top1 = bottom1 + rect.getHeight
+              val left1 = rect.getX
+              val right1 = left1 + rect.getWidth
+
+              val bottom2 = rect2.getY
+              val top2 = bottom2 + rect2.getHeight
+              val left2 = rect2.getX
+              val right2 = left2 + rect2.getWidth
+
+              val topBottom = top2 - bottom1
+              val bottomTop = bottom2 - top1
+              val rightLeft = left2 - right1
+              val leftRight = right2 - left1
+              val topBottomAbs = Math.abs(topBottom)
+              val bottomTopAbs = Math.abs(bottomTop)
+              val rightLeftAbs = Math.abs(rightLeft)
+              val leftRightAbs = Math.abs(leftRight)
+
+              if (bottomTopAbs < topBottomAbs) {
+                if (leftRightAbs < rightLeftAbs) {
+                  if (bottomTopAbs < leftRightAbs) {
+                    colliding.add(new Vector2(0, bottomTop))
+                  }
+                  else {
+                    colliding.add(new Vector2(leftRight, 0))
+                  }
+                }
+                else {
+                  if (bottomTopAbs < rightLeftAbs) {
+                    colliding.add(new Vector2(0, bottomTop))
+                  }
+                  else {
+                    colliding.add(new Vector2(rightLeft, 0))
+                  }
+                }
+              }
+              else {
+                if (leftRightAbs < rightLeftAbs) {
+                  if (topBottomAbs < leftRightAbs) {
+                    colliding.add(new Vector2(0, topBottom))
+                  }
+                  else {
+                    colliding.add(new Vector2(leftRight, 0))
+                  }
+                }
+                else {
+                  if (topBottomAbs < rightLeftAbs) {
+                    colliding.add(new Vector2(0, topBottom))
+                  }
+                  else {
+                    colliding.add(new Vector2(rightLeft, 0))
+                  }
+                }
+              }
+              collidingType.add(ent2.collisionType)
+            }
+          }
+        }
+      }
+      if (colliding.size > 0) {
+        ent.onCollision(colliding, collidingType)
+      }
+    }
+
+    for (i <- 0 to removeLater.size - 1) {
+      entities.removeValue(removeLater.get(i), true)
+    }
+    removeLater.clear()
+    for (i <- 0 to addLater.size - 1) {
+      entities.add(addLater.get(i))
+    }
+    addLater.clear()
   }
+
+  def render(delta: Float) {
+    import Gdx.gl
+    import com.badlogic.gdx.graphics.GL10.GL_COLOR_BUFFER_BIT
+    gl.glClear(GL_COLOR_BUFFER_BIT)
+    entities.iterator().foreach((ent) => {
+      ent.update(Main.instance.worldStep)
+    })
+
+    doCollision()
+
+    val renderer = Main.instance.renderer
+    if (Main.DEBUG) {
+      renderer.begin(ShapeRenderer.ShapeType.Rectangle)
+      entities.iterator().foreach((ent) => {
+        val pos = ent.position()
+        val size = ent.size()
+        ent.collisionType match {
+          case Entity.COLLISION_DYNAMIC => {
+            renderer.setColor(Color.RED)
+          }
+          case Entity.COLLISION_TREASURE => {
+            renderer.setColor(Color.YELLOW)
+          }
+          case _ => {
+            renderer.setColor(Color.WHITE)
+          }
+        }
+        renderer.rect(pos.x, pos.y, size.x, size.y)
+      })
+      renderer.end()
+    }
+  }
+
+  def keyTyped(character: Char): Boolean = {
+    false
+  }
+
+  def mouseMoved(screenX: Int, screenY: Int): Boolean = {
+    false
+  }
+
+  def keyDown(keycode: Int): Boolean = {
+    import com.badlogic.gdx.Input.Keys
+    keycode match {
+      case Keys.Q => {
+        Utils.log("Q pressed, quitting application")
+        Gdx.app.exit()
+        true
+      }
+      case _ => {
+        //            log("Unhandled key, checking entities. KEY=" + keycode)
+        entities.iterator().foldLeft(false)((accum, ent) => {
+          //              log("Sending keycode to: " + ent)
+          if (ent.key(keycode, true)) {
+            return true
+          }
+          false
+        })
+      }
+    }
+  }
+
+  def touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean = {
+    false
+  }
+
+  def keyUp(keycode: Int): Boolean = {
+    keycode match {
+      case _ => {
+        //            log("Unhandled key, checking entities. KEY=" + keycode)
+        entities.iterator().foldLeft(false)((accum, ent) => {
+          //              log("Sending keycode to: " + ent)
+          if (ent.key(keycode, false)) {
+            return true
+          }
+          false
+        })
+      }
+    }
+  }
+
+  def scrolled(amount: Int): Boolean = {
+    false
+  }
+
+  def touchUp(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean = {
+    false
+  }
+
+  def touchDragged(screenX: Int, screenY: Int, pointer: Int): Boolean = {
+    false
+  }
+}
+
+class LevelDebug extends Level {
+
+  import Utils.log
+  import Main.{instance => game}
+
+  def load() {
+    log("Creating some static blocks")
+    for (i <- 0 to (game.width / 10).asInstanceOf[Int]) {
+      entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
+    }
+    entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
+    entities.add(new StaticBlock(game.width / 10.0f * 4, 90, game.width / 10.0f, 20))
+
+    log("Creating treasure")
+    entities.add(new Treasure(150, 100))
+
+    log("Making the player")
+    entities.add(new Player(0, 80))
+  }
+
+  def isGoalMet(): Boolean = true
+
+  def resize(width: Int, height: Int) {}
+
+  def show() {
+    load()
+  }
+
+  def hide() {}
+
+  def pause() {}
+
+  def resume() {}
+
+  def dispose() {}
 }
