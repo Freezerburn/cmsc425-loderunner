@@ -103,14 +103,14 @@ class Main extends Game with ApplicationListener {
 
   def addScore(score: Long) {
     this.score += Math.round(score * scoreMultiplier)
-    log("Added %d score to get %d total (x%.2f)".format(score, this.score, this.scoreMultiplier))
+    log("Added %d (x%.2f) score to get %d total".format(score, this.scoreMultiplier, this.score))
   }
 }
 
 object Entity {
   val COLLISION_NONE: Int = 0
   val COLLISION_STATIC: Int = 1
-  val COLLISION_DYNAMIC: Int = 2
+  val COLLISION_PLAYER: Int = 2
   val COLLISION_TREASURE: Int = 3
   val COLLISION_LADDER: Int = 4
   val COLLISION_ENEMY: Int = 5
@@ -225,7 +225,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
   def rectangle(): Rectangle = new Rectangle(rect)
 
-  def collisionType: Int = Entity.COLLISION_DYNAMIC
+  def collisionType: Int = Entity.COLLISION_PLAYER
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {
     var x = Float.MaxValue
@@ -316,7 +316,7 @@ class Treasure(x: Float, y: Float) extends Entity {
     for (i <- 0 to collisions.size - 1) {
       val colType = collisionTypes.get(i)
       colType match {
-        case Entity.COLLISION_DYNAMIC => {
+        case Entity.COLLISION_PLAYER => {
           Main.instance.addScore(Treasure.SCORE)
           destroy()
         }
@@ -445,7 +445,7 @@ trait Level extends Screen with InputProcessor {
         val pos = ent.position()
         val size = ent.size()
         ent.collisionType match {
-          case Entity.COLLISION_DYNAMIC => {
+          case Entity.COLLISION_PLAYER => {
             renderer.setColor(Color.RED)
           }
           case Entity.COLLISION_TREASURE => {
@@ -544,17 +544,28 @@ class LevelDebug extends Level {
 
   def isGoalMet(): Boolean = true
 
-  def resize(width: Int, height: Int) {}
+  def resize(width: Int, height: Int) {
+    log("Resized")
+  }
 
   def show() {
+    log("Shown")
     load()
   }
 
-  def hide() {}
+  def hide() {
+    log("Hidden")
+  }
 
-  def pause() {}
+  def pause() {
+    log("Paused")
+  }
 
-  def resume() {}
+  def resume() {
+    log("Resumed")
+  }
 
-  def dispose() {}
+  def dispose() {
+    log("Disposed")
+  }
 }
