@@ -8,7 +8,7 @@ import com.badlogic.gdx.utils.{Array => GdxArray}
 
 import scala.collection.JavaConversions._
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import com.badlogic.gdx.graphics.g2d.TextureRegion
+import com.badlogic.gdx.graphics.g2d.{SpriteBatch, BitmapFont, TextureRegion}
 
 /**
  * Created with IntelliJ IDEA.
@@ -59,10 +59,12 @@ class Main extends Game with ApplicationListener {
   val worldStep = 1 / 60.0f
 
   var renderer: ShapeRenderer = null
+  var spriteRenderer: SpriteBatch = null
   val entities: GdxArray[Entity] = new GdxArray[Entity]()
   val removeLater: GdxArray[Entity] = new GdxArray[Entity]()
   val addLater: GdxArray[Entity] = new GdxArray[Entity]()
 
+  val gameOverLevel = new GameOver
   val levels: GdxArray[Level] = new GdxArray[Level]()
   levels.add(new LevelDebug)
   var currentLevelIndex: Int = 0
@@ -82,12 +84,15 @@ class Main extends Game with ApplicationListener {
     camera.update()
 
     renderer = new ShapeRenderer()
+    spriteRenderer = new SpriteBatch()
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
 
     currentLevel = levels.get(currentLevelIndex)
     log("Setting current level to level " + currentLevelIndex + ", " + currentLevel)
+    //    setScreen(gameOverLevel)
+    //    Gdx.input.setInputProcessor(gameOverLevel)
     setScreen(currentLevel)
     Gdx.input.setInputProcessor(currentLevel)
   }
@@ -105,6 +110,19 @@ class Main extends Game with ApplicationListener {
     this.score += Math.round(score * scoreMultiplier)
     log("Added %d (x%.2f) score to get %d total".format(score, this.scoreMultiplier, this.score))
   }
+
+  def nextLevel() {
+    currentLevelIndex += 1
+    if (currentLevelIndex == levels.size) {
+      setScreen(gameOverLevel)
+      Gdx.input.setInputProcessor(gameOverLevel)
+    }
+    else {
+      currentLevel = levels.get(currentLevelIndex)
+      setScreen(currentLevel)
+      Gdx.input.setInputProcessor(currentLevel)
+    }
+  }
 }
 
 object Entity {
@@ -114,6 +132,7 @@ object Entity {
   val COLLISION_TREASURE: Int = 3
   val COLLISION_LADDER: Int = 4
   val COLLISION_ENEMY: Int = 5
+  val COLLISION_DOOR: Int = 6
 }
 
 trait Entity {
@@ -162,8 +181,8 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
   import Utils.log
 
-  val VEL: Float = 100.0f
-  val JUMP_VEL: Float = 290.0f
+  val VEL: Float = 140.0f
+  val JUMP_VEL: Float = 390.0f
   var jumping = false
   val rect = new Rectangle(x, y, 20.0f, 40.0f)
   acceleration.y = -9.81f * 70.0f
@@ -244,8 +263,11 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         }
         case Entity.COLLISION_TREASURE => {
           log("Collided with treasure")
-          val foo = Main.instance.entities.indexOf(this, true)
-          log("Player has index: " + foo)
+          //          val foo = Main.instance.entities.indexOf(this, true)
+          //          log("Player has index: " + foo)
+        }
+        case Entity.COLLISION_DOOR => {
+          //          log("Collided with door")
         }
         case _ => Unit
       }
@@ -328,12 +350,40 @@ class Treasure(x: Float, y: Float) extends Entity {
   def getSprite: TextureRegion = ???
 }
 
+class Door(x: Float, y: Float) extends Entity {
+  val width = 15.0f
+  val height = 25.0f
+  val pos = new Vector2(x, y)
+
+  def update(dt: Float) {}
+
+  def getSprite: TextureRegion = ???
+
+  def key(keyCode: Int, pressed: Boolean): Boolean = false
+
+  def position(): Vector2 = new Vector2(pos)
+
+  def size(): Vector2 = new Vector2(width, height)
+
+  def rectangle(): Rectangle = new Rectangle(pos.x, pos.y, width, height)
+
+  def collisionType: Int = Entity.COLLISION_DOOR
+
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int]) {
+    for (i <- 0 to collisionTypes.size - 1) {
+      collisionTypes.get(i) match {
+        case Entity.COLLISION_PLAYER => {
+          //          Utils.log("Door collision -> Player")
+        }
+      }
+    }
+  }
+}
+
 trait Level extends Screen with InputProcessor {
   val entities = new GdxArray[Entity]()
   val addLater = new GdxArray[Entity]()
   val removeLater = new GdxArray[Entity]()
-
-  def load()
 
   def isGoalMet: Boolean
 
@@ -346,6 +396,7 @@ trait Level extends Screen with InputProcessor {
     for (i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
       colliding.clear()
+      collidingType.clear()
       if (ent.collisionType != Entity.COLLISION_STATIC && ent.collisionType != Entity.COLLISION_NONE) {
         for (j <- 0 to entities.size - 1) {
           val ent2 = entities.get(j)
@@ -451,6 +502,9 @@ trait Level extends Screen with InputProcessor {
           case Entity.COLLISION_TREASURE => {
             renderer.setColor(Color.YELLOW)
           }
+          case Entity.COLLISION_DOOR => {
+            renderer.setColor(Color.GREEN)
+          }
           case _ => {
             renderer.setColor(Color.WHITE)
           }
@@ -527,22 +581,42 @@ class LevelDebug extends Level {
   import Utils.log
   import Main.{instance => game}
 
+  var isLoaded = false
+
   def load() {
-    log("Creating some static blocks")
-    for (i <- 0 to (game.width / 10).asInstanceOf[Int]) {
-      entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
+    if (!isLoaded) {
+      isLoaded = true
+      log("Creating some static blocks")
+      for (i <- 0 to (game.width / 10)) {
+        entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
+      }
+      entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
+      entities.add(new StaticBlock(game.width / 10.0f * 4, 90, game.width / 10.0f, 20))
+
+      log("Creating treasure")
+      entities.add(new Treasure(150, 100))
+
+      log("Creating door")
+      entities.add(new Door(game.width / 10.0f * 7, 45))
+
+      log("Making the player")
+      entities.add(new Player(0, 80))
     }
-    entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
-    entities.add(new StaticBlock(game.width / 10.0f * 4, 90, game.width / 10.0f, 20))
-
-    log("Creating treasure")
-    entities.add(new Treasure(150, 100))
-
-    log("Making the player")
-    entities.add(new Player(0, 80))
   }
 
-  def isGoalMet(): Boolean = true
+  override def keyDown(keycode: Int): Boolean = {
+    keycode match {
+      case com.badlogic.gdx.Input.Keys.W => {
+        Main.instance.nextLevel()
+        true
+      }
+      case _ => {
+        super.keyDown(keycode)
+      }
+    }
+  }
+
+  def isGoalMet: Boolean = true
 
   def resize(width: Int, height: Int) {
     log("Resized")
@@ -568,4 +642,43 @@ class LevelDebug extends Level {
   def dispose() {
     log("Disposed")
   }
+}
+
+class GameOver extends Level {
+  val QUIT_AFTER = 2.0f
+  var font: BitmapFont = null
+  var time: Float = 0
+
+  def resize(width: Int, height: Int) {}
+
+  def show() {
+    font = new BitmapFont()
+  }
+
+  override def render(delta: Float) {
+    import Gdx.gl
+    import com.badlogic.gdx.graphics.GL10.GL_COLOR_BUFFER_BIT
+    time += delta
+    if (time > QUIT_AFTER) {
+      Utils.log("Spent >2s on game over screen, quitting")
+      Gdx.app.exit()
+    }
+
+    gl.glClear(GL_COLOR_BUFFER_BIT)
+
+    val renderer = Main.instance.spriteRenderer
+    renderer.begin()
+    font.draw(renderer, "Game over, man", Main.instance.width / 2.0f - 70, Main.instance.height / 2.0f)
+    renderer.end()
+  }
+
+  def hide() {}
+
+  def pause() {}
+
+  def resume() {}
+
+  def dispose() {}
+
+  def isGoalMet: Boolean = true
 }
