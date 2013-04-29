@@ -1,8 +1,8 @@
 package loderunner
 
 import com.badlogic.gdx._
-import com.badlogic.gdx.graphics.{Color, OrthographicCamera}
-import com.badlogic.gdx.math.{Vector2, Rectangle}
+import com.badlogic.gdx.graphics.{FPSLogger, Color, OrthographicCamera}
+import com.badlogic.gdx.math.{Vector3, Vector2, Rectangle}
 import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.utils.{Array => GdxArray}
 
@@ -67,6 +67,7 @@ class Main extends Game with ApplicationListener {
   val gameOverLevel = new GameOver
   val levels: GdxArray[Level] = new GdxArray[Level]()
   levels.add(new LevelDebug)
+  levels.add(new LevelOne)
   var currentLevelIndex: Int = 0
   var currentLevel: Level = null
 
@@ -87,7 +88,10 @@ class Main extends Game with ApplicationListener {
     spriteRenderer = new SpriteBatch()
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
+    import com.badlogic.gdx.graphics.GL10
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
+    gl.glEnable(GL10.GL_BLEND)
+    gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA)
 
     currentLevel = levels.get(currentLevelIndex)
     log("Setting current level to level " + currentLevelIndex + ", " + currentLevel)
@@ -177,16 +181,22 @@ trait MovingEntity {
   }
 }
 
+object Player {
+  val WIDTH = 20.0f
+  val HEIGHT = 40.0f
+}
+
 class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
   import Utils.log
 
   val VEL: Float = 140.0f
-  val JUMP_VEL: Float = 390.0f
+  val JUMP_VEL: Float = 330.0f
   var jumping = false
-  val rect = new Rectangle(x, y, 20.0f, 40.0f)
+  val rect = new Rectangle(x, y, Player.WIDTH, Player.HEIGHT)
   acceleration.y = -9.81f * 70.0f
   val accelerationScale: Float = 1
+  val doorDelta = new Vector2()
 
   override def key(keyCode: Int, pressed: Boolean): Boolean = {
     import com.badlogic.gdx.Input.Keys
@@ -230,6 +240,17 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
           false
         }
       }
+      case Keys.UP => {
+        if (pressed) {
+          if (Math.abs(doorDelta.x) > Player.WIDTH / 2.0f) {
+            log("Up pressed with door delta: " + doorDelta.x)
+            if (Main.instance.currentLevel.isGoalMet) {
+              Main.instance.nextLevel()
+            }
+          }
+        }
+        true
+      }
       case _ => false
     }
   }
@@ -263,11 +284,9 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         }
         case Entity.COLLISION_TREASURE => {
           log("Collided with treasure")
-          //          val foo = Main.instance.entities.indexOf(this, true)
-          //          log("Player has index: " + foo)
         }
         case Entity.COLLISION_DOOR => {
-          //          log("Collided with door")
+          doorDelta.set(vec)
         }
         case _ => Unit
       }
@@ -350,9 +369,12 @@ class Treasure(x: Float, y: Float) extends Entity {
   def getSprite: TextureRegion = ???
 }
 
+object Door {
+  val WIDTH = 35.0f
+  val HEIGHT = 35.0f
+}
+
 class Door(x: Float, y: Float) extends Entity {
-  val width = 15.0f
-  val height = 25.0f
   val pos = new Vector2(x, y)
 
   def update(dt: Float) {}
@@ -363,20 +385,20 @@ class Door(x: Float, y: Float) extends Entity {
 
   def position(): Vector2 = new Vector2(pos)
 
-  def size(): Vector2 = new Vector2(width, height)
+  def size(): Vector2 = new Vector2(Door.WIDTH, Door.HEIGHT)
 
-  def rectangle(): Rectangle = new Rectangle(pos.x, pos.y, width, height)
+  def rectangle(): Rectangle = new Rectangle(pos.x, pos.y, Door.WIDTH, Door.HEIGHT)
 
   def collisionType: Int = Entity.COLLISION_DOOR
 
   def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int]) {
-    for (i <- 0 to collisionTypes.size - 1) {
-      collisionTypes.get(i) match {
-        case Entity.COLLISION_PLAYER => {
-          //          Utils.log("Door collision -> Player")
-        }
-      }
-    }
+    //    for (i <- 0 to collisionTypes.size - 1) {
+    //      collisionTypes.get(i) match {
+    //        case Entity.COLLISION_PLAYER => {
+    //          //          Utils.log("Door collision -> Player")
+    //        }
+    //      }
+    //    }
   }
 }
 
@@ -384,8 +406,11 @@ trait Level extends Screen with InputProcessor {
   val entities = new GdxArray[Entity]()
   val addLater = new GdxArray[Entity]()
   val removeLater = new GdxArray[Entity]()
+  var fpslogger: FPSLogger = null
 
   def isGoalMet: Boolean
+
+  def moveCamera()
 
   def doCollision() {
     // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
@@ -488,9 +513,11 @@ trait Level extends Screen with InputProcessor {
     })
 
     doCollision()
+    moveCamera()
 
-    val renderer = Main.instance.renderer
     if (Main.DEBUG) {
+      val renderer = Main.instance.renderer
+      renderer.setProjectionMatrix(Main.instance.camera.combined)
       renderer.begin(ShapeRenderer.ShapeType.Rectangle)
       entities.iterator().foreach((ent) => {
         val pos = ent.position()
@@ -512,6 +539,10 @@ trait Level extends Screen with InputProcessor {
         renderer.rect(pos.x, pos.y, size.x, size.y)
       })
       renderer.end()
+
+      if (fpslogger != null) {
+        fpslogger.log()
+      }
     }
   }
 
@@ -597,7 +628,7 @@ class LevelDebug extends Level {
       entities.add(new Treasure(150, 100))
 
       log("Creating door")
-      entities.add(new Door(game.width / 10.0f * 7, 45))
+      entities.add(new Door(game.width / 10.0f * 7, 40))
 
       log("Making the player")
       entities.add(new Player(0, 80))
@@ -642,6 +673,53 @@ class LevelDebug extends Level {
   def dispose() {
     log("Disposed")
   }
+
+  def moveCamera() {}
+}
+
+class LevelOne extends Level {
+  val BLOCK_SIZE = 30.0f
+  var player: Player = null
+
+  def resize(width: Int, height: Int) {}
+
+  def show() {
+    fpslogger = new FPSLogger
+
+    player = new Player(BLOCK_SIZE * 2, BLOCK_SIZE)
+    entities.add(player)
+
+    for (i <- 0 to 100) {
+      entities.add(new StaticBlock(BLOCK_SIZE * i, 0, BLOCK_SIZE, BLOCK_SIZE))
+      entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE))
+    }
+  }
+
+  def hide() {}
+
+  def pause() {}
+
+  def resume() {}
+
+  def dispose() {}
+
+  def isGoalMet: Boolean = true
+
+  def moveCamera() {
+    val cam = Main.instance.camera
+    val pos = player.position()
+    val campos = new Vector3(cam.position)
+    //    Utils.log("Camera position: " + campos)
+    //    Utils.log("Player position: " + pos)
+    cam.translate(pos.x - campos.x, pos.y - campos.y)
+    if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
+      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f), 0)
+    }
+    if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
+      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f))
+    }
+    cam.update()
+  }
 }
 
 class GameOver extends Level {
@@ -681,4 +759,6 @@ class GameOver extends Level {
   def dispose() {}
 
   def isGoalMet: Boolean = true
+
+  def moveCamera() {}
 }
