@@ -184,6 +184,8 @@ trait MovingEntity {
 object Player {
   val WIDTH = 20.0f
   val HEIGHT = 40.0f
+  val IGNORE_DELTA = 1.55f
+  val GRAVITY = -9.81f * 70.0f
 }
 
 class Player(x: Float, y: Float) extends Entity with MovingEntity {
@@ -194,7 +196,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   val JUMP_VEL: Float = 330.0f
   var jumping = false
   val rect = new Rectangle(x, y, Player.WIDTH, Player.HEIGHT)
-  acceleration.y = -9.81f * 70.0f
+  acceleration.y = Player.GRAVITY
   val accelerationScale: Float = 1
   val doorDelta = new Vector2()
 
@@ -233,6 +235,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
             log("Jumping")
             jumping = true
             velocity.y = JUMP_VEL
+            acceleration.y = Player.GRAVITY
           }
           true
         }
@@ -295,13 +298,20 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
     if (x == Float.MaxValue) {
       x = 0
     }
+    else if(Math.abs(x) < Player.IGNORE_DELTA) {
+      x = 0
+    }
     if (y == Float.MaxValue) {
+      y = 0
+    }
+    else if(Math.abs(y) < Player.IGNORE_DELTA) {
       y = 0
     }
     if (y > 0) {
       if (velocity.y < 0) {
         jumping = false
         velocity.y = 0
+        acceleration.y = 0
       }
     }
 
@@ -632,6 +642,9 @@ class LevelDebug extends Level {
 
       log("Making the player")
       entities.add(new Player(0, 80))
+
+      log("Moving camera by: " + (Main.instance.width / 2 - 100) + "x" + Main.instance.height / 2)
+      Main.instance.camera.translate(Main.instance.width / 2 - 100, Main.instance.height / 2)
     }
   }
 
