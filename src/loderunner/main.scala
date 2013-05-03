@@ -78,11 +78,12 @@ class Main extends Game with ApplicationListener {
 
   def create() {
     log("Creating game")
-    log("Creating orthographic camera")
-    camera = new OrthographicCamera()
-    camera.viewportHeight = width
-    camera.viewportWidth = height
-    camera.update()
+    resize(Main.WIDTH, Main.HEIGHT)
+//    log("Creating orthographic camera")
+//    camera = new OrthographicCamera(2f * (Main.WIDTH / Main.HEIGHT), 2f)
+//    camera.viewportHeight = width
+//    camera.viewportWidth = height
+//    camera.update()
 
     renderer = new ShapeRenderer()
     spriteRenderer = new SpriteBatch()
@@ -104,8 +105,9 @@ class Main extends Game with ApplicationListener {
   override def resize(width: Int, height: Int) {
     this.width = width
     this.height = height
-    camera.viewportHeight = width
-    camera.viewportWidth = height
+    camera = new OrthographicCamera(width * (width.asInstanceOf[Float] / height.asInstanceOf[Float]), width)
+//    camera.viewportHeight = width
+//    camera.viewportWidth = height
     //    camera.zoom = Main.BOX_TO_WORLD
     camera.update()
   }
@@ -137,6 +139,11 @@ object Entity {
   val COLLISION_LADDER: Int = 4
   val COLLISION_ENEMY: Int = 5
   val COLLISION_DOOR: Int = 6
+
+  val COLLISION_LEFT: Int = 0
+  val COLLISION_RIGHT: Int = 1
+  val COLLISION_UP: Int = 2
+  val COLLISION_DOWN: Int = 3
 }
 
 trait Entity {
@@ -161,7 +168,7 @@ trait Entity {
 
   def collisionType: Int
 
-  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int])
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int], directions: GdxArray[(Int, Int)])
 }
 
 trait MovingEntity {
@@ -270,9 +277,11 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
   def collisionType: Int = Entity.COLLISION_PLAYER
 
-  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int], directions: GdxArray[(Int, Int)]) {
     var x = Float.MaxValue
     var y = Float.MaxValue
+    var numStatics = 0
+    val statics = Array[Int](0, 0)
     for (i <- 0 to collisions.size - 1) {
       val vec = collisions.get(i)
       val colType = collisionTypes.get(i)
@@ -283,6 +292,10 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
           }
           if (vec.y != 0 && Math.abs(vec.y) < Math.abs(y)) {
             y = vec.y
+          }
+          numStatics += 1
+          if(numStatics < 3) {
+            statics(numStatics - 1) = i
           }
         }
         case Entity.COLLISION_TREASURE => {
@@ -295,23 +308,28 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
       }
     }
 
-    if (x == Float.MaxValue) {
-      x = 0
-    }
-    else if(Math.abs(x) < Player.IGNORE_DELTA) {
-      x = 0
-    }
     if (y == Float.MaxValue) {
       y = 0
     }
-    else if(Math.abs(y) < Player.IGNORE_DELTA) {
-      y = 0
+    else if(numStatics == 2 && y > 0 && x != Float.MaxValue) {
+      if(directions.get(0)._1 == directions.get(1)._1) {
+        y = 0
+      }
     }
+    //    else if(Math.abs(y) < Player.IGNORE_DELTA) {
+    //      y = 0
+    //    }
+    if (x == Float.MaxValue) {
+      x = 0
+    }
+    //    else if(Math.abs(x) < Player.IGNORE_DELTA) {
+    //      x = 0
+    //    }
     if (y > 0) {
       if (velocity.y < 0) {
         jumping = false
         velocity.y = 0
-        acceleration.y = 0
+//        acceleration.y = 0
       }
     }
 
@@ -337,7 +355,7 @@ class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entit
 
   def collisionType: Int = Entity.COLLISION_STATIC
 
-  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int]) {}
+  def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int], directions: GdxArray[(Int, Int)]) {}
 
   def getSprite: TextureRegion = ???
 }
@@ -363,7 +381,7 @@ class Treasure(x: Float, y: Float) extends Entity {
 
   def collisionType: Int = Entity.COLLISION_TREASURE
 
-  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int]) {
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: GdxArray[(Int, Int)]) {
     for (i <- 0 to collisions.size - 1) {
       val colType = collisionTypes.get(i)
       colType match {
@@ -401,7 +419,7 @@ class Door(x: Float, y: Float) extends Entity {
 
   def collisionType: Int = Entity.COLLISION_DOOR
 
-  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int]) {
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: GdxArray[(Int, Int)]) {
     //    for (i <- 0 to collisionTypes.size - 1) {
     //      collisionTypes.get(i) match {
     //        case Entity.COLLISION_PLAYER => {
@@ -428,6 +446,7 @@ trait Level extends Screen with InputProcessor {
     //  collisions should be culled though due to not doing static-to-static collision, ignoring NONE, etc..
     val colliding = new GdxArray[Vector2]
     val collidingType = new GdxArray[Int]
+    val directions = new GdxArray[(Int, Int)]
     for (i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
       colliding.clear()
@@ -462,17 +481,21 @@ trait Level extends Screen with InputProcessor {
                 if (leftRightAbs < rightLeftAbs) {
                   if (bottomTopAbs < leftRightAbs) {
                     colliding.add(new Vector2(0, bottomTop))
+                    directions.add((Entity.COLLISION_LEFT, Entity.COLLISION_UP))
                   }
                   else {
                     colliding.add(new Vector2(leftRight, 0))
+                    directions.add((Entity.COLLISION_LEFT, Entity.COLLISION_UP))
                   }
                 }
                 else {
                   if (bottomTopAbs < rightLeftAbs) {
                     colliding.add(new Vector2(0, bottomTop))
+                    directions.add((Entity.COLLISION_RIGHT, Entity.COLLISION_UP))
                   }
                   else {
                     colliding.add(new Vector2(rightLeft, 0))
+                    directions.add((Entity.COLLISION_RIGHT, Entity.COLLISION_UP))
                   }
                 }
               }
@@ -480,17 +503,21 @@ trait Level extends Screen with InputProcessor {
                 if (leftRightAbs < rightLeftAbs) {
                   if (topBottomAbs < leftRightAbs) {
                     colliding.add(new Vector2(0, topBottom))
+                    directions.add((Entity.COLLISION_LEFT, Entity.COLLISION_DOWN))
                   }
                   else {
                     colliding.add(new Vector2(leftRight, 0))
+                    directions.add((Entity.COLLISION_LEFT, Entity.COLLISION_DOWN))
                   }
                 }
                 else {
                   if (topBottomAbs < rightLeftAbs) {
                     colliding.add(new Vector2(0, topBottom))
+                    directions.add((Entity.COLLISION_RIGHT, Entity.COLLISION_DOWN))
                   }
                   else {
                     colliding.add(new Vector2(rightLeft, 0))
+                    directions.add((Entity.COLLISION_RIGHT, Entity.COLLISION_DOWN))
                   }
                 }
               }
@@ -500,7 +527,7 @@ trait Level extends Screen with InputProcessor {
         }
       }
       if (colliding.size > 0) {
-        ent.onCollision(colliding, collidingType)
+        ent.onCollision(colliding, collidingType, directions)
       }
     }
 
@@ -518,6 +545,9 @@ trait Level extends Screen with InputProcessor {
     import Gdx.gl
     import com.badlogic.gdx.graphics.GL10.GL_COLOR_BUFFER_BIT
     gl.glClear(GL_COLOR_BUFFER_BIT)
+    Main.instance.camera.update()
+    Main.instance.camera.apply(Gdx.graphics.getGL10)
+
     entities.iterator().foreach((ent) => {
       ent.update(Main.instance.worldStep)
     })
@@ -625,27 +655,27 @@ class LevelDebug extends Level {
   var isLoaded = false
 
   def load() {
-    if (!isLoaded) {
-      isLoaded = true
-      log("Creating some static blocks")
-      for (i <- 0 to (game.width / 10)) {
-        entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
-      }
-      entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
-      entities.add(new StaticBlock(game.width / 10.0f * 4, 90, game.width / 10.0f, 20))
-
-      log("Creating treasure")
-      entities.add(new Treasure(150, 100))
-
-      log("Creating door")
-      entities.add(new Door(game.width / 10.0f * 7, 40))
-
-      log("Making the player")
-      entities.add(new Player(0, 80))
-
-      log("Moving camera by: " + (Main.instance.width / 2 - 100) + "x" + Main.instance.height / 2)
-      Main.instance.camera.translate(Main.instance.width / 2 - 100, Main.instance.height / 2)
+    isLoaded = true
+    log("Creating some static blocks")
+    for (i <- 0 to (game.width / 10)) {
+      entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
     }
+    entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
+    entities.add(new StaticBlock(game.width / 10.0f * 4 - 17, 90, game.width / 10.0f, 20))
+
+    log("Creating treasure")
+    entities.add(new Treasure(150, 100))
+
+    log("Creating door")
+    entities.add(new Door(game.width / 10.0f * 7, 40))
+
+    log("Making the player")
+    entities.add(new Player(0, 80))
+
+    log("Moving camera by: " + (Main.instance.width / 2 - 100) + "x" + Main.instance.height / 2)
+    Main.instance.camera.translate(Main.instance.width / 2 - 100, Main.instance.height / 2)
+    Main.instance.camera.update()
+    Main.instance.camera.apply(Gdx.graphics.getGL10)
   }
 
   override def keyDown(keycode: Int): Boolean = {
@@ -691,7 +721,7 @@ class LevelDebug extends Level {
 }
 
 class LevelOne extends Level {
-  val BLOCK_SIZE = 30.0f
+  val BLOCK_SIZE = Player.HEIGHT
   var player: Player = null
 
   def resize(width: Int, height: Int) {}
@@ -726,10 +756,10 @@ class LevelOne extends Level {
     //    Utils.log("Player position: " + pos)
     cam.translate(pos.x - campos.x, pos.y - campos.y)
     if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
-      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f), 0)
+      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
     }
     if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
-      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f))
+      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
     }
     cam.update()
   }
