@@ -18,7 +18,7 @@ object Utils {
   def newGame(game: ApplicationListener, width: Int, height: Int) {
     val config = new LwjglApplicationConfiguration
     config.title = "Game Test"
-    config.useGL20 = true
+    config.useGL20 = false
     config.width = width
     config.height = height
     config.resizable = false
