@@ -9,6 +9,7 @@ import com.badlogic.gdx.utils.{Array => GdxArray}
 import scala.collection.JavaConversions._
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.graphics.g2d.{SpriteBatch, BitmapFont, TextureRegion}
+import java.util
 
 /**
  * Created with IntelliJ IDEA.
@@ -24,18 +25,9 @@ object Main {
   val WIDTH = 640
   val HEIGHT = 480
 
-  val WORLD_TO_BOX = 0.01f
-  val BOX_TO_WORLD = 100.0f
-
   val DEBUG = true
 
-  def boxToWorld(value: Float): Float = {
-    value * BOX_TO_WORLD
-  }
-
-  def worldToBox(value: Float): Float = {
-    value * WORLD_TO_BOX
-  }
+  val BLOCK_SIZE = Player.HEIGHT
 
   var instance: Main = null
 
@@ -83,7 +75,7 @@ class Main extends Game with ApplicationListener {
 //    camera = new OrthographicCamera(2f * (Main.WIDTH / Main.HEIGHT), 2f)
 //    camera.viewportHeight = width
 //    camera.viewportWidth = height
-//    camera.update()
+//    camera.tick()
 
     renderer = new ShapeRenderer()
     spriteRenderer = new SpriteBatch()
@@ -136,10 +128,11 @@ object Entity {
   val COLLISION_NONE: Int = 0
   val COLLISION_STATIC: Int = 1
   val COLLISION_PLAYER: Int = 2
-  val COLLISION_TREASURE: Int = 3
-  val COLLISION_LADDER: Int = 4
-  val COLLISION_ENEMY: Int = 5
-  val COLLISION_DOOR: Int = 6
+  val COLLISION_TREASURE: Int = 4
+  val COLLISION_LADDER: Int = 8
+  val COLLISION_ENEMY: Int = 16
+  val COLLISION_DOOR: Int = 32
+  val COLLISION_STATIC_FLOOR = 64
 
   val COLLISION_LEFT: Int = 0
   val COLLISION_RIGHT: Int = 1
@@ -150,7 +143,8 @@ object Entity {
 trait Entity {
   var isDestroyed = false
 
-  def update(dt: Float)
+  def doMove(dt: Float)
+  def tick(dt: Float)
 
   def getSprite: TextureRegion
 
@@ -170,6 +164,7 @@ trait Entity {
   def collisionType: Int
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int], directions: GdxArray[(Int, Int)])
+  def lostCollision(collisionType: Int)
 }
 
 trait MovingEntity {
@@ -183,7 +178,7 @@ trait MovingEntity {
     rect.setY(rect.getY + y)
   }
 
-  def updateMove(dt: Float) {
+  def doMove(dt: Float) {
     velocity.add(acceleration.x * dt * accelerationScale, acceleration.y * dt * accelerationScale)
     move(velocity.x * dt, velocity.y * dt)
   }
@@ -206,7 +201,11 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   val rect = new Rectangle(x, y, Player.WIDTH, Player.HEIGHT)
   acceleration.y = Player.GRAVITY
   val accelerationScale: Float = 1
-  val doorDelta = new Vector2()
+  val doorDelta = new Vector2
+
+  val ladderDeltaTrigger = Player.WIDTH / 3.0f
+  val ladderDelta = new Vector2
+  var onLadder = false
 
   override def key(keyCode: Int, pressed: Boolean): Boolean = {
     import com.badlogic.gdx.Input.Keys
@@ -259,6 +258,32 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
               Main.instance.nextLevel()
             }
           }
+          if(Math.abs(ladderDelta.x) > ladderDeltaTrigger || ladderDelta.y != 0) {
+            log("Up pressed with ladder delta: " + ladderDelta.x)
+            onLadder = true
+            acceleration.y = 0
+            velocity.y = VEL
+          }
+        }
+        else {
+          if(onLadder) {
+            velocity.y = 0
+          }
+        }
+        true
+      }
+      case Keys.DOWN => {
+        if(pressed) {
+          if(onLadder || ladderDelta.y != 0) {
+            onLadder = true
+            velocity.y = -VEL
+            acceleration.y = 0
+          }
+        }
+        else {
+          if(onLadder) {
+            velocity.y = 0
+          }
         }
         true
       }
@@ -266,9 +291,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
     }
   }
 
-  override def update(dt: Float) {
-    updateMove(dt)
-  }
+  def tick(dt: Float) { }
 
   def position(): Vector2 = new Vector2(rect.getX, rect.getY)
 
@@ -287,16 +310,20 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
       val vec = collisions.get(i)
       val colType = collisionTypes.get(i)
       colType match {
-        case Entity.COLLISION_STATIC => {
-          if (vec.x != 0 && Math.abs(vec.x) < Math.abs(x)) {
-            x = vec.x
+        case Entity.COLLISION_STATIC | Entity.COLLISION_STATIC_FLOOR => {
+          if(onLadder && colType == Entity.COLLISION_STATIC) {
           }
-          if (vec.y != 0 && Math.abs(vec.y) < Math.abs(y)) {
-            y = vec.y
-          }
-          numStatics += 1
-          if(numStatics < 3) {
-            statics(numStatics - 1) = i
+          else {
+            if (vec.x != 0 && Math.abs(vec.x) < Math.abs(x)) {
+              x = vec.x
+            }
+            if (vec.y != 0 && Math.abs(vec.y) < Math.abs(y)) {
+              y = vec.y
+            }
+            numStatics += 1
+            if(numStatics < 3) {
+              statics(numStatics - 1) = i
+            }
           }
         }
         case Entity.COLLISION_TREASURE => {
@@ -304,6 +331,10 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         }
         case Entity.COLLISION_DOOR => {
           doorDelta.set(vec)
+        }
+        case Entity.COLLISION_LADDER => {
+//          ladderDelta.x = if(vec.x == 0) vec.y else vec.x
+          ladderDelta.set(vec)
         }
         case _ => Unit
       }
@@ -317,34 +348,48 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
         y = 0
       }
     }
-    //    else if(Math.abs(y) < Player.IGNORE_DELTA) {
-    //      y = 0
-    //    }
     if (x == Float.MaxValue) {
       x = 0
     }
-    //    else if(Math.abs(x) < Player.IGNORE_DELTA) {
-    //      x = 0
-    //    }
     if (y > 0) {
       if (velocity.y < 0) {
         jumping = false
         velocity.y = 0
-//        acceleration.y = 0
       }
+    }
+
+    if(onLadder && (Math.abs(ladderDelta.x) < ladderDeltaTrigger && ladderDelta.y == 0)) {
+      onLadder = false
+      acceleration.y = Player.GRAVITY
     }
 
     move(x, y)
   }
 
+  def lostCollision(collisionType: Int) {
+    collisionType match {
+      case Entity.COLLISION_LADDER => {
+        if(onLadder) {
+          log("Lost")
+          ladderDelta.set(0, 0)
+          onLadder = false
+          velocity.y = 0
+          acceleration.y = Player.GRAVITY
+        }
+      }
+      case _ => {
+      }
+    }
+  }
+
   def getSprite: TextureRegion = ???
 }
 
-class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entity with MovingEntity {
+class StaticBlock(x: Float, y: Float, width: Float, height: Float, floor: Boolean) extends Entity with MovingEntity {
   val rect: Rectangle = new Rectangle(x, y, width, height)
   val accelerationScale: Float = 0
 
-  def update(dt: Float) {}
+  def tick(dt: Float) {}
 
   def key(keyCode: Int, pressed: Boolean): Boolean = false
 
@@ -354,9 +399,10 @@ class StaticBlock(x: Float, y: Float, width: Float, height: Float) extends Entit
 
   def rectangle(): Rectangle = new Rectangle(rect)
 
-  def collisionType: Int = Entity.COLLISION_STATIC
+  def collisionType: Int = if(floor) Entity.COLLISION_STATIC_FLOOR else Entity.COLLISION_STATIC
 
   def onCollision(collisions: GdxArray[Vector2], collisionTypes: GdxArray[Int], directions: GdxArray[(Int, Int)]) {}
+  def lostCollision(collisionType: Int) {}
 
   def getSprite: TextureRegion = ???
 }
@@ -370,7 +416,8 @@ object Treasure {
 class Treasure(x: Float, y: Float) extends Entity {
   val pos = new Vector2(x, y)
 
-  def update(dt: Float) {}
+  def doMove(dt: Float) {}
+  def tick(dt: Float) {}
 
   def key(keyCode: Int, pressed: Boolean): Boolean = false
 
@@ -387,12 +434,19 @@ class Treasure(x: Float, y: Float) extends Entity {
       val colType = collisionTypes.get(i)
       colType match {
         case Entity.COLLISION_PLAYER => {
+          Utils.log("Player collided with treasure, adding score")
+          Utils.log(collisions.toString())
+          Utils.log(collisionTypes.toString())
+          Utils.log(directions.toString())
           Main.instance.addScore(Treasure.SCORE)
           destroy()
         }
         case _ => Unit
       }
     }
+  }
+
+  def lostCollision(collisionType: Int) {
   }
 
   def getSprite: TextureRegion = ???
@@ -402,11 +456,11 @@ object Door {
   val WIDTH = 35.0f
   val HEIGHT = 35.0f
 }
-
 class Door(x: Float, y: Float) extends Entity {
   val pos = new Vector2(x, y)
 
-  def update(dt: Float) {}
+  def doMove(dt: Float) {}
+  def tick(dt: Float) {}
 
   def getSprite: TextureRegion = ???
 
@@ -421,14 +475,36 @@ class Door(x: Float, y: Float) extends Entity {
   def collisionType: Int = Entity.COLLISION_DOOR
 
   def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: GdxArray[(Int, Int)]) {
-    //    for (i <- 0 to collisionTypes.size - 1) {
-    //      collisionTypes.get(i) match {
-    //        case Entity.COLLISION_PLAYER => {
-    //          //          Utils.log("Door collision -> Player")
-    //        }
-    //      }
-    //    }
   }
+
+  def lostCollision(collisionType: Int) {}
+}
+
+object Ladder {
+  val WIDTH = Main.BLOCK_SIZE / 2.0f
+  val HEIGHT = Main.BLOCK_SIZE * 2.0f + Main.BLOCK_SIZE / 10.0f
+}
+class Ladder(x: Float, y: Float) extends Entity {
+  val pos = new Vector2(x + Ladder.WIDTH / 2.0f, y)
+
+  def doMove(dt: Float) {}
+  def tick(dt: Float) {}
+
+  def getSprite: TextureRegion = ???
+
+  def key(keyCode: Int, pressed: Boolean): Boolean = {
+    false
+  }
+
+  def position(): Vector2 = new Vector2(pos)
+  def size(): Vector2 = new Vector2(Ladder.WIDTH, Ladder.HEIGHT)
+  def rectangle(): Rectangle = new Rectangle(pos.x, pos.y, Ladder.WIDTH, Ladder.HEIGHT)
+
+  def collisionType: Int = Entity.COLLISION_LADDER
+
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: utils.Array[(Int, Int)]) {}
+
+  def lostCollision(collisionType: Int) {}
 }
 
 trait Level extends Screen with InputProcessor {
@@ -441,6 +517,95 @@ trait Level extends Screen with InputProcessor {
 
   def moveCamera()
 
+  def collisionBetween(ent: Entity, ent2: Entity, delta: Vector2, directions: Array[Int]):Boolean = {
+    delta.set(0, 0)
+    if (ent2 != ent && ent2.collisionType != Entity.COLLISION_NONE) {
+      val rect = ent.rectangle()
+      val rect2 = ent2.rectangle()
+      if (rect.overlaps(rect2)) {
+        val bottom1 = rect.getY
+        val top1 = bottom1 + rect.getHeight
+        val left1 = rect.getX
+        val right1 = left1 + rect.getWidth
+
+        val bottom2 = rect2.getY
+        val top2 = bottom2 + rect2.getHeight
+        val left2 = rect2.getX
+        val right2 = left2 + rect2.getWidth
+
+        val topBottom = top2 - bottom1
+        val bottomTop = bottom2 - top1
+        val rightLeft = left2 - right1
+        val leftRight = right2 - left1
+        val topBottomAbs = Math.abs(topBottom)
+        val bottomTopAbs = Math.abs(bottomTop)
+        val rightLeftAbs = Math.abs(rightLeft)
+        val leftRightAbs = Math.abs(leftRight)
+
+        if (bottomTopAbs < topBottomAbs) {
+          if (leftRightAbs < rightLeftAbs) {
+            if (bottomTopAbs < leftRightAbs) {
+              delta.set(0, bottomTop)
+              directions(0) = Entity.COLLISION_LEFT
+              directions(1) = Entity.COLLISION_UP
+            }
+            else {
+              delta.set(leftRight, 0)
+              directions(0) = Entity.COLLISION_LEFT
+              directions(1) = Entity.COLLISION_UP
+            }
+          }
+          else {
+            if (bottomTopAbs < rightLeftAbs) {
+              delta.set(0, bottomTop)
+              directions(0) = Entity.COLLISION_RIGHT
+              directions(1) = Entity.COLLISION_UP
+            }
+            else {
+              delta.set(rightLeft, 0)
+              directions(0) = Entity.COLLISION_RIGHT
+              directions(1) = Entity.COLLISION_UP
+            }
+          }
+        }
+        else {
+          if (leftRightAbs < rightLeftAbs) {
+            if (topBottomAbs < leftRightAbs) {
+              delta.set(0, topBottom)
+              directions(0) = Entity.COLLISION_LEFT
+              directions(1) = Entity.COLLISION_DOWN
+            }
+            else {
+              delta.set(leftRight, 0)
+              directions(0) = Entity.COLLISION_LEFT
+              directions(1) = Entity.COLLISION_DOWN
+            }
+          }
+          else {
+            if (topBottomAbs < rightLeftAbs) {
+              delta.set(0, topBottom)
+              directions(0) = Entity.COLLISION_RIGHT
+              directions(1) = Entity.COLLISION_DOWN
+            }
+            else {
+              delta.set(rightLeft, 0)
+              directions(0) = Entity.COLLISION_RIGHT
+              directions(1) = Entity.COLLISION_DOWN
+            }
+          }
+        }
+//        Utils.log("Collision between: " + ent + ", " + ent2)
+        true
+      }
+      else {
+        false
+      }
+    }
+    else {
+      false
+    }
+  }
+
   def doCollision() {
     // Well this is kind of a big fustercluck, but whatever. If it works, I couldn't care less.
     // Also: this has worst-case performance of O(n^2) if all entities are COLLISION_DYNAMIC/etc. A lot of
@@ -448,10 +613,12 @@ trait Level extends Screen with InputProcessor {
     val colliding = new GdxArray[Vector2]
     val collidingType = new GdxArray[Int]
     val directions = new GdxArray[(Int, Int)]
+    val collisionIndices = new GdxArray[Int]
     for (i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
       colliding.clear()
       collidingType.clear()
+      collisionIndices.clear()
       if (ent.collisionType != Entity.COLLISION_STATIC && ent.collisionType != Entity.COLLISION_NONE) {
         for (j <- 0 to entities.size - 1) {
           val ent2 = entities.get(j)
@@ -459,6 +626,7 @@ trait Level extends Screen with InputProcessor {
             val rect = ent.rectangle()
             val rect2 = ent2.rectangle()
             if (rect.overlaps(rect2)) {
+              collisionIndices.add(j)
               val bottom1 = rect.getY
               val top1 = bottom1 + rect.getHeight
               val left1 = rect.getX
@@ -529,6 +697,15 @@ trait Level extends Screen with InputProcessor {
       }
       if (colliding.size > 0) {
         ent.onCollision(colliding, collidingType, directions)
+        val rect = ent.rectangle()
+        if(ent.collisionType == Entity.COLLISION_PLAYER) {
+          Utils.log(collisionIndices.toString())
+        }
+        for(j <- 0 to colliding.size - 1) {
+          if(!rect.overlaps(entities.get(collisionIndices.get(j)).rectangle())) {
+            ent.lostCollision(collidingType.get(j))
+          }
+        }
       }
     }
 
@@ -546,11 +723,76 @@ trait Level extends Screen with InputProcessor {
     import Gdx.gl
     import com.badlogic.gdx.graphics.GL10.GL_COLOR_BUFFER_BIT
 
-    entities.iterator().foreach((ent) => {
-      ent.update(Main.instance.worldStep)
+    // Get the stuff each entity collides with...
+    val collisions = new util.HashMap[Entity, GdxArray[Entity]]()
+    val delta = new Vector2
+    var curArr: GdxArray[Entity] = null
+    val colliding = new GdxArray[Vector2]
+    val collidingType = new GdxArray[Int]
+    val directions = new GdxArray[(Int, Int)]
+    val directionsArr = Array(0, 0)
+    for(i <- 0 to entities.size - 1) {
+      val ent = entities.get(i)
+      for(j <- 0 to entities.size - 1) {
+        val ent2 = entities.get(j)
+        if(!(ent.collisionType == Entity.COLLISION_STATIC && ent2.collisionType == Entity.COLLISION_STATIC) &&
+           !(ent.collisionType == Entity.COLLISION_STATIC && ent2.collisionType == Entity.COLLISION_STATIC_FLOOR) &&
+           !(ent.collisionType == Entity.COLLISION_STATIC_FLOOR && ent.collisionType == Entity.COLLISION_STATIC) &&
+           !(ent.collisionType == Entity.COLLISION_STATIC_FLOOR && ent2.collisionType == Entity.COLLISION_STATIC_FLOOR)) {
+          if(collisionBetween(ent, ent2, delta, directionsArr)) {
+            colliding.add(new Vector2(delta))
+            collidingType.add(ent2.collisionType)
+            directions.add((directionsArr(0), directionsArr(1)))
+            if(curArr == null) {
+              curArr = new GdxArray[Entity]
+              curArr.add(ent2)
+              collisions.put(ent, curArr)
+            }
+            else {
+              curArr.add(ent2)
+            }
+          }
+        }
+      }
+      if(colliding.size > 0) {
+        ent.onCollision(colliding, collidingType, directions)
+      }
+      colliding.clear()
+      collidingType.clear()
+      directions.clear()
+      curArr = null
+    }
+
+    for (i <- 0 to removeLater.size - 1) {
+      entities.removeValue(removeLater.get(i), true)
+    }
+    removeLater.clear()
+    for (i <- 0 to addLater.size - 1) {
+      entities.add(addLater.get(i))
+    }
+    addLater.clear()
+
+    // THEN move everything...
+    for(i <- 0 to entities.size - 1) {
+      entities.get(i).doMove(Main.instance.worldStep)
+    }
+
+    // Finally check for anything that each entity is not colliding with anymore after moving
+    collisions.entrySet().iterator().foreach((entry) => {
+      val key = entry.getKey
+      val value = entry.getValue
+      val keyRect = key.rectangle()
+      for(i <- 0 to value.size - 1) {
+        if(!keyRect.overlaps(value.get(i).rectangle())) {
+          key.lostCollision(value.get(i).collisionType)
+        }
+      }
     })
 
-    doCollision()
+    for(i <- 0 to entities.size - 1) {
+      entities.get(i).tick(Main.instance.worldStep)
+    }
+
     moveCamera()
 
     gl.glClear(GL_COLOR_BUFFER_BIT)
@@ -572,6 +814,9 @@ trait Level extends Screen with InputProcessor {
           }
           case Entity.COLLISION_DOOR => {
             renderer.setColor(Color.GREEN)
+          }
+          case Entity.COLLISION_LADDER => {
+            renderer.setColor(Color.PINK)
           }
           case _ => {
             renderer.setColor(Color.WHITE)
@@ -664,16 +909,19 @@ class LevelDebug extends Level {
     isLoaded = true
     log("Creating some static blocks")
     for (i <- 0 to (game.width / 10)) {
-      entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20))
+      entities.add(new StaticBlock(game.width / 10.0f * i, 20, game.width / 10.0f, 20, true))
     }
-    entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20))
-    entities.add(new StaticBlock(game.width / 10.0f * 4 - 17, 90, game.width / 10.0f, 20))
+    entities.add(new StaticBlock(game.width / 10.0f * 5, 50, game.width / 10.0f, 20, false))
+    entities.add(new StaticBlock(game.width / 10.0f * 4 - 17, 90, game.width / 10.0f, 20, false))
 
     log("Creating treasure")
     entities.add(new Treasure(150, 100))
 
     log("Creating door")
     entities.add(new Door(game.width / 10.0f * 7, 40))
+
+    log("Creating ladder")
+    entities.add(new Ladder(game.width / 10.0f * 4, game.width / 10.0f * 2))
 
     log("Making the player")
     entities.add(new Player(0, 80))
@@ -727,7 +975,7 @@ class LevelDebug extends Level {
 }
 
 class LevelOne extends Level {
-  val BLOCK_SIZE = Player.HEIGHT
+  import Main.BLOCK_SIZE
   var player: Player = null
 
   def resize(width: Int, height: Int) {}
@@ -739,9 +987,12 @@ class LevelOne extends Level {
     entities.add(player)
 
     for (i <- 0 to 100) {
-      entities.add(new StaticBlock(BLOCK_SIZE * i, 0, BLOCK_SIZE, BLOCK_SIZE))
-      entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE))
+      entities.add(new StaticBlock(BLOCK_SIZE * i, 0, BLOCK_SIZE, BLOCK_SIZE, true))
+      entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE, false))
     }
+    entities.add(new StaticBlock(BLOCK_SIZE * 4, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
+    entities.add(new Ladder(BLOCK_SIZE * 4, BLOCK_SIZE))
+    entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
   }
 
   def hide() {}
