@@ -110,6 +110,7 @@ class Main extends Game with ApplicationListener {
 //    camera.viewportWidth = height
     //    camera.zoom = Main.BOX_TO_WORLD
     camera.update()
+    camera.apply(Gdx.graphics.getGL10)
   }
 
   def addScore(score: Long) {
@@ -544,9 +545,6 @@ trait Level extends Screen with InputProcessor {
   def render(delta: Float) {
     import Gdx.gl
     import com.badlogic.gdx.graphics.GL10.GL_COLOR_BUFFER_BIT
-    gl.glClear(GL_COLOR_BUFFER_BIT)
-    Main.instance.camera.update()
-    Main.instance.camera.apply(Gdx.graphics.getGL10)
 
     entities.iterator().foreach((ent) => {
       ent.update(Main.instance.worldStep)
@@ -555,9 +553,12 @@ trait Level extends Screen with InputProcessor {
     doCollision()
     moveCamera()
 
+    gl.glClear(GL_COLOR_BUFFER_BIT)
+    Main.instance.camera.update()
+    Main.instance.camera.apply(Gdx.graphics.getGL10)
+
     if (Main.DEBUG) {
       val renderer = Main.instance.renderer
-      renderer.setProjectionMatrix(Main.instance.camera.combined)
       renderer.begin(ShapeRenderer.ShapeType.Rectangle)
       entities.iterator().foreach((ent) => {
         val pos = ent.position()
@@ -600,6 +601,11 @@ trait Level extends Screen with InputProcessor {
       case Keys.Q => {
         Utils.log("Q pressed, quitting application")
         Gdx.app.exit()
+        true
+      }
+      case Keys.W => {
+        Utils.log("W pressed, skipping to next level")
+        Main.instance.nextLevel()
         true
       }
       case _ => {
@@ -675,7 +681,7 @@ class LevelDebug extends Level {
     log("Moving camera by: " + (Main.instance.width / 2 - 100) + "x" + Main.instance.height / 2)
     Main.instance.camera.translate(Main.instance.width / 2 - 100, Main.instance.height / 2)
     Main.instance.camera.update()
-    Main.instance.camera.apply(Gdx.graphics.getGL10)
+//    Main.instance.camera.apply(Gdx.graphics.getGL10)
   }
 
   override def keyDown(keycode: Int): Boolean = {
