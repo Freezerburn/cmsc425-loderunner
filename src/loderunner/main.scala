@@ -60,7 +60,7 @@ class Main extends Game with ApplicationListener {
   val levels: GdxArray[Level] = new GdxArray[Level]()
   levels.add(new LevelDebug)
   levels.add(new LevelOne)
-  var currentLevelIndex: Int = 0
+  var currentLevelIndex: Int = 1
   var currentLevel: Level = null
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
@@ -102,7 +102,7 @@ class Main extends Game with ApplicationListener {
 //    camera.viewportWidth = height
     //    camera.zoom = Main.BOX_TO_WORLD
     camera.update()
-    camera.apply(Gdx.graphics.getGL10)
+//    camera.apply(Gdx.graphics.getGL10)
   }
 
   def addScore(score: Long) {
@@ -594,7 +594,6 @@ trait Level extends Screen with InputProcessor {
             }
           }
         }
-//        Utils.log("Collision between: " + ent + ", " + ent2)
         true
       }
       else {
@@ -684,10 +683,11 @@ trait Level extends Screen with InputProcessor {
 
     gl.glClear(GL_COLOR_BUFFER_BIT)
     Main.instance.camera.update()
-    Main.instance.camera.apply(Gdx.graphics.getGL10)
+//    Main.instance.camera.apply(Gdx.graphics.getGL10)
 
     if (Main.DEBUG) {
       val renderer = Main.instance.renderer
+      renderer.setProjectionMatrix(Main.instance.camera.combined)
       renderer.begin(ShapeRenderer.ShapeType.Rectangle)
       entities.iterator().foreach((ent) => {
         val pos = ent.position()
