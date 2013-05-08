@@ -67,6 +67,8 @@ class Main extends Game with ApplicationListener {
 
   var brickTexture: Texture = null
   var treasureTexture: Texture = null
+  var doorTexture: Texture = null
+  var backgroundTexture: Texture = null
 
   var score: Long = 0L
   var scoreMultiplier: Float = 1.0f
@@ -85,7 +87,8 @@ class Main extends Game with ApplicationListener {
 
     brickTexture = new Texture(Gdx.files.internal("assets/brick.png"))
     treasureTexture = new Texture(Gdx.files.internal("assets/coin.png"))
-
+    doorTexture = new Texture(Gdx.files.internal("assets/door.png"))
+    backgroundTexture = new Texture(Gdx.files.internal("assets/background.png"))
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     import com.badlogic.gdx.graphics.GL10
@@ -694,6 +697,12 @@ trait Level extends Screen with InputProcessor {
     Main.instance.camera.update()
 //    Main.instance.camera.apply(Gdx.graphics.getGL10)
 
+    val spriteRenderer = Main.instance.spriteRenderer
+    val backgroundTexture = Main.instance.backgroundTexture
+    spriteRenderer.begin()
+    spriteRenderer.draw(backgroundTexture, 0, 0)
+    spriteRenderer.end()
+
     if (Main.DEBUG) {
       val renderer = Main.instance.renderer
       renderer.setProjectionMatrix(Main.instance.camera.combined)
@@ -715,7 +724,7 @@ trait Level extends Screen with InputProcessor {
             renderer.setColor(Color.PINK)
           }
           case _ => {
-            renderer.setColor(Color.WHITE)
+            renderer.setColor(Color.BLACK)
           }
         }
         renderer.rect(pos.x, pos.y, size.x, size.y)
@@ -728,6 +737,7 @@ trait Level extends Screen with InputProcessor {
         ent.collisionType match {
           case Entity.COLLISION_STATIC_FLOOR => {
             val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
             val brickTexture = Main.instance.brickTexture
             spriteRenderer.begin();
             spriteRenderer.draw(brickTexture, pos.x, pos.y);
@@ -735,9 +745,18 @@ trait Level extends Screen with InputProcessor {
           }
           case Entity.COLLISION_TREASURE => {
             val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
             val treasureTexture = Main.instance.treasureTexture
             spriteRenderer.begin();
             spriteRenderer.draw(treasureTexture, pos.x, pos.y);
+            spriteRenderer.end();
+          }
+          case Entity.COLLISION_DOOR => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+            val doorTexture = Main.instance.doorTexture
+            spriteRenderer.begin();
+            spriteRenderer.draw(doorTexture, pos.x, pos.y);
             spriteRenderer.end();
           }
           case _ => {
@@ -913,6 +932,8 @@ class LevelOne extends Level {
     entities.add(new StaticBlock(BLOCK_SIZE * 4, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
     entities.add(new Ladder(BLOCK_SIZE * 4, BLOCK_SIZE))
     entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
+
+    entities.add(new Treasure(150,150))
   }
 
   def hide() {}
