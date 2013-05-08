@@ -1,7 +1,7 @@
 package loderunner
 
 import com.badlogic.gdx._
-import com.badlogic.gdx.graphics.{FPSLogger, Color, OrthographicCamera}
+import com.badlogic.gdx.graphics.{Texture, FPSLogger, Color, OrthographicCamera}
 import com.badlogic.gdx.math.{Vector3, Vector2, Rectangle}
 import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.utils.{Array => GdxArray}
@@ -65,6 +65,9 @@ class Main extends Game with ApplicationListener {
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
 
+  var brickTexture: Texture = null
+  var treasureTexture: Texture = null
+
   var score: Long = 0L
   var scoreMultiplier: Float = 1.0f
 
@@ -80,9 +83,15 @@ class Main extends Game with ApplicationListener {
     renderer = new ShapeRenderer()
     spriteRenderer = new SpriteBatch()
 
+    brickTexture = new Texture(Gdx.files.internal("assets/brick.png"))
+    treasureTexture = new Texture(Gdx.files.internal("assets/coin.png"))
+
+
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     import com.badlogic.gdx.graphics.GL10
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
+    gl.glEnable(GL10.GL_BLEND)
+    gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA)
     gl.glEnable(GL10.GL_BLEND)
     gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA)
 
@@ -408,8 +417,8 @@ class StaticBlock(x: Float, y: Float, width: Float, height: Float, floor: Boolea
 }
 
 object Treasure {
-  val WIDTH = 20.0f
-  val HEIGHT = 20.0f
+  val WIDTH = 32.0f
+  val HEIGHT = 32.0f
   val SCORE = 100L
 }
 
@@ -713,6 +722,30 @@ trait Level extends Screen with InputProcessor {
       })
       renderer.end()
 
+      entities.iterator().foreach((ent) => {
+        val pos = ent.position()
+        val size = ent.size()
+        ent.collisionType match {
+          case Entity.COLLISION_STATIC_FLOOR => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            val brickTexture = Main.instance.brickTexture
+            spriteRenderer.begin();
+            spriteRenderer.draw(brickTexture, pos.x, pos.y);
+            spriteRenderer.end();
+          }
+          case Entity.COLLISION_TREASURE => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            val treasureTexture = Main.instance.treasureTexture
+            spriteRenderer.begin();
+            spriteRenderer.draw(treasureTexture, pos.x, pos.y);
+            spriteRenderer.end();
+          }
+          case _ => {
+//            renderer.setColor(Color.WHITE)
+          }
+        }
+      })
+
       if (fpslogger != null) {
         fpslogger.log()
       }
@@ -802,7 +835,7 @@ class LevelDebug extends Level {
     entities.add(new StaticBlock(game.width / 10.0f * 4 - 17, 90, game.width / 10.0f, 20, false))
 
     log("Creating treasure")
-    entities.add(new Treasure(150, 100))
+    entities.add(new Treasure(150, 150))
 
     log("Creating door")
     entities.add(new Door(game.width / 10.0f * 7, 40))
