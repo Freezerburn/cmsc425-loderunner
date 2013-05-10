@@ -68,6 +68,7 @@ class Main extends Game with ApplicationListener {
   var brickTexture: Texture = null
   var treasureTexture: Texture = null
   var doorTexture: Texture = null
+  var ladderTexture: Texture = null
   var backgroundTexture: Texture = null
 
   var score: Long = 0L
@@ -88,6 +89,7 @@ class Main extends Game with ApplicationListener {
     brickTexture = new Texture(Gdx.files.internal("assets/brick.png"))
     treasureTexture = new Texture(Gdx.files.internal("assets/coin.png"))
     doorTexture = new Texture(Gdx.files.internal("assets/door.png"))
+    ladderTexture = new Texture(Gdx.files.internal("assets/ladder.png"))
     backgroundTexture = new Texture(Gdx.files.internal("assets/background.png"))
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
@@ -715,10 +717,10 @@ trait Level extends Screen with InputProcessor {
             renderer.setColor(Color.RED)
           }
           case Entity.COLLISION_TREASURE => {
-            renderer.setColor(Color.YELLOW)
+            renderer.setColor(Color.CLEAR)
           }
           case Entity.COLLISION_DOOR => {
-            renderer.setColor(Color.GREEN)
+            renderer.setColor(Color.CLEAR)
           }
           case Entity.COLLISION_LADDER => {
             renderer.setColor(Color.PINK)
@@ -739,25 +741,36 @@ trait Level extends Screen with InputProcessor {
             val spriteRenderer = Main.instance.spriteRenderer
             spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
             val brickTexture = Main.instance.brickTexture
-            spriteRenderer.begin();
-            spriteRenderer.draw(brickTexture, pos.x, pos.y);
-            spriteRenderer.end();
+            spriteRenderer.begin()
+            spriteRenderer.draw(brickTexture, pos.x, pos.y)
+            spriteRenderer.end()
           }
           case Entity.COLLISION_TREASURE => {
             val spriteRenderer = Main.instance.spriteRenderer
             spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
             val treasureTexture = Main.instance.treasureTexture
-            spriteRenderer.begin();
-            spriteRenderer.draw(treasureTexture, pos.x, pos.y);
-            spriteRenderer.end();
+            spriteRenderer.begin()
+            spriteRenderer.draw(treasureTexture, pos.x, pos.y)
+            spriteRenderer.end()
           }
           case Entity.COLLISION_DOOR => {
             val spriteRenderer = Main.instance.spriteRenderer
             spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
             val doorTexture = Main.instance.doorTexture
-            spriteRenderer.begin();
-            spriteRenderer.draw(doorTexture, pos.x, pos.y);
-            spriteRenderer.end();
+            spriteRenderer.begin()
+            spriteRenderer.draw(doorTexture, pos.x, pos.y)
+            spriteRenderer.end()
+          }
+          case Entity.COLLISION_LADDER => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+            val ladderTexture = Main.instance.ladderTexture
+            spriteRenderer.begin()
+            var i = 0
+            for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
+              spriteRenderer.draw(ladderTexture, pos.x, pos.y+20*i)
+            }
+            spriteRenderer.end()
           }
           case _ => {
 //            renderer.setColor(Color.WHITE)
