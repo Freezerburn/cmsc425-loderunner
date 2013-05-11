@@ -66,7 +66,7 @@ class Main extends Game with ApplicationListener {
 
   val clearColor: Array[Float] = Array(0.2f, 0.2f, 0.2f)
 
-  var brickTexture: Texture = null
+  var boxTexture: Texture = null
   var treasureTexture: Texture = null
   var doorTexture: Texture = null
   var ladderTexture: Texture = null
@@ -87,7 +87,7 @@ class Main extends Game with ApplicationListener {
     renderer = new ShapeRenderer()
     spriteRenderer = new SpriteBatch()
 
-    brickTexture = new Texture(Gdx.files.internal("assets/brick.png"))
+    boxTexture = new Texture(Gdx.files.internal("assets/box.png"))
     treasureTexture = new Texture(Gdx.files.internal("assets/coin.png"))
     doorTexture = new Texture(Gdx.files.internal("assets/door.png"))
     ladderTexture = new Texture(Gdx.files.internal("assets/ladder.png"))
@@ -742,9 +742,17 @@ trait Level extends Screen with InputProcessor {
           case Entity.COLLISION_STATIC_FLOOR => {
             val spriteRenderer = Main.instance.spriteRenderer
             spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val brickTexture = Main.instance.brickTexture
+            val boxTexture = Main.instance.boxTexture
             spriteRenderer.begin()
-            spriteRenderer.draw(brickTexture, pos.x, pos.y)
+            spriteRenderer.draw(boxTexture, pos.x, pos.y)
+            spriteRenderer.end()
+          }
+          case Entity.COLLISION_STATIC => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+            val boxTexture = Main.instance.boxTexture
+            spriteRenderer.begin()
+            spriteRenderer.draw(boxTexture, pos.x, pos.y)
             spriteRenderer.end()
           }
           case Entity.COLLISION_TREASURE => {
