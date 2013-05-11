@@ -948,13 +948,13 @@ trait CameraFollowsPlayer {
       cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
     }
     else if(cam.position.x + cam.viewportWidth / 2.0f > bounds.x) {
-      cam.translate(+(cam.position.x + cam.viewportWidth / 2.0f), 0)
+      cam.translate(-(cam.position.x + cam.viewportWidth / 2.0f - bounds.x), 0)
     }
     if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
       cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
     }
     else if(cam.position.y + cam.viewportHeight / 2.0f > bounds.y) {
-      cam.translate(0, +(cam.position.y + cam.viewportHeight / 2.0f))
+      cam.translate(0, -(cam.position.x + cam.viewportWidth / 2.0f - bounds.x))
     }
     cam.update()
   }
@@ -963,7 +963,7 @@ trait CameraFollowsPlayer {
 class LevelOne extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
-  val WIDTH = 640f
+  val WIDTH = 880f
   val HEIGHT = 480f
 
   def levelSize():Vector2 = {
