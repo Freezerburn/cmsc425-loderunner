@@ -60,6 +60,7 @@ class Main extends Game with ApplicationListener {
   val levels: GdxArray[Level] = new GdxArray[Level]()
   levels.add(new LevelDebug)
   levels.add(new LevelOne)
+  levels.add(new LevelTwo)
   var currentLevelIndex: Int = 1
   var currentLevel: Level = null
 
@@ -947,6 +948,64 @@ class LevelOne extends Level {
     entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
 
     entities.add(new Treasure(150,150))
+  }
+
+  def hide() {}
+
+  def pause() {}
+
+  def resume() {}
+
+  def dispose() {}
+
+  def isGoalMet: Boolean = true
+
+  def moveCamera() {
+    val cam = Main.instance.camera
+    val pos = player.position()
+    val campos = new Vector3(cam.position)
+    //    Utils.log("Camera position: " + campos)
+    //    Utils.log("Player position: " + pos)
+    cam.translate(pos.x - campos.x, pos.y - campos.y)
+    if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
+      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
+    }
+    if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
+      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
+    }
+    cam.update()
+  }
+}
+
+class LevelTwo extends Level {
+  import Main.BLOCK_SIZE
+  var player: Player = null
+
+  def resize(width: Int, height: Int) {}
+
+  def show() {
+    fpslogger = new FPSLogger
+
+    player = new Player(BLOCK_SIZE * 2, BLOCK_SIZE)
+    entities.add(player)
+
+    for (i <- 0 to 100) {
+      entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE, false))
+    }
+
+    for (i <- 0 to 10) {
+      entities.add(new StaticBlock(BLOCK_SIZE * i, 0, BLOCK_SIZE, BLOCK_SIZE, true))
+    }
+    for (i <- 14 to 100) {
+      entities.add(new StaticBlock(BLOCK_SIZE * i, 40, BLOCK_SIZE, BLOCK_SIZE, true))
+    }
+
+    for (i <- 10 to 14) {
+      entities.add(new StaticBlock(BLOCK_SIZE * i, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
+    }
+
+    entities.add(new Ladder(BLOCK_SIZE * 10, BLOCK_SIZE))
+    entities.add(new Door(BLOCK_SIZE * 16, BLOCK_SIZE*2))
   }
 
   def hide() {}
