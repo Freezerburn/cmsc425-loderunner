@@ -531,6 +531,7 @@ trait Level extends Screen with InputProcessor {
   def isGoalMet: Boolean
 
   def moveCamera()
+  def levelSize():Vector2
 
   def collisionBetween(ent: Entity, ent2: Entity, delta: Vector2, directions: Array[Int]):Boolean = {
     delta.set(0, 0)
@@ -858,6 +859,10 @@ class LevelDebug extends Level {
 
   var isLoaded = false
 
+  def levelSize():Vector2 = {
+    new Vector2
+  }
+
   def load() {
     isLoaded = true
     log("Creating some static blocks")
@@ -927,9 +932,43 @@ class LevelDebug extends Level {
   def moveCamera() {}
 }
 
-class LevelOne extends Level {
+trait CameraFollowsPlayer {
+  var player: Player
+  def levelSize():Vector2
+
+  def moveCamera() {
+    val cam = Main.instance.camera
+    val pos = player.position()
+    val campos = new Vector3(cam.position)
+    val bounds = levelSize()
+    //    Utils.log("Camera position: " + campos)
+    //    Utils.log("Player position: " + pos)
+    cam.translate(pos.x - campos.x, pos.y - campos.y)
+    if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
+      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
+    }
+    else if(cam.position.x + cam.viewportWidth / 2.0f > bounds.x) {
+      cam.translate(+(cam.position.x + cam.viewportWidth / 2.0f), 0)
+    }
+    if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
+      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
+    }
+    else if(cam.position.y + cam.viewportHeight / 2.0f > bounds.y) {
+      cam.translate(0, +(cam.position.y + cam.viewportHeight / 2.0f))
+    }
+    cam.update()
+  }
+}
+
+class LevelOne extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
+  val WIDTH = 640f
+  val HEIGHT = 480f
+
+  def levelSize():Vector2 = {
+    new Vector2(WIDTH, HEIGHT)
+  }
 
   def resize(width: Int, height: Int) {}
 
@@ -959,27 +998,17 @@ class LevelOne extends Level {
   def dispose() {}
 
   def isGoalMet: Boolean = true
-
-  def moveCamera() {
-    val cam = Main.instance.camera
-    val pos = player.position()
-    val campos = new Vector3(cam.position)
-    //    Utils.log("Camera position: " + campos)
-    //    Utils.log("Player position: " + pos)
-    cam.translate(pos.x - campos.x, pos.y - campos.y)
-    if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
-      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
-    }
-    if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
-      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
-    }
-    cam.update()
-  }
 }
 
-class LevelTwo extends Level {
+class LevelTwo extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
+  val WIDTH = 640f
+  val HEIGHT = 640f
+
+  def levelSize():Vector2 = {
+    new Vector2(WIDTH, HEIGHT)
+  }
 
   def resize(width: Int, height: Int) {}
 
@@ -1017,28 +1046,16 @@ class LevelTwo extends Level {
   def dispose() {}
 
   def isGoalMet: Boolean = true
-
-  def moveCamera() {
-    val cam = Main.instance.camera
-    val pos = player.position()
-    val campos = new Vector3(cam.position)
-    //    Utils.log("Camera position: " + campos)
-    //    Utils.log("Player position: " + pos)
-    cam.translate(pos.x - campos.x, pos.y - campos.y)
-    if (cam.position.x - cam.viewportWidth / 2.0f < 0) {
-      cam.translate(-(cam.position.x - cam.viewportWidth / 2.0f) - 5, 0)
-    }
-    if (cam.position.y - cam.viewportHeight / 2.0f < 0) {
-      cam.translate(0, -(cam.position.y - cam.viewportHeight / 2.0f) - 5)
-    }
-    cam.update()
-  }
 }
 
 class GameOver extends Level {
   val QUIT_AFTER = 2.0f
   var font: BitmapFont = null
   var time: Float = 0
+
+  def levelSize():Vector2 = {
+    new Vector2
+  }
 
   def resize(width: Int, height: Int) {}
 
