@@ -71,6 +71,7 @@ class Main extends Game with ApplicationListener {
   var doorTexture: Texture = null
   var ladderTexture: Texture = null
   var backgroundTexture: Texture = null
+  var playerTexture: Texture = null
 
   var score: Long = 0L
   var scoreMultiplier: Float = 1.0f
@@ -92,12 +93,11 @@ class Main extends Game with ApplicationListener {
     doorTexture = new Texture(Gdx.files.internal("assets/door.png"))
     ladderTexture = new Texture(Gdx.files.internal("assets/ladder.png"))
     backgroundTexture = new Texture(Gdx.files.internal("assets/background.png"))
+    playerTexture = new Texture(Gdx.files.internal("assets/player.png"))
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     import com.badlogic.gdx.graphics.GL10
     gl.glClearColor(clearColor(0), clearColor(1), clearColor(2), 1.0f)
-    gl.glEnable(GL10.GL_BLEND)
-    gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA)
     gl.glEnable(GL10.GL_BLEND)
     gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA)
 
@@ -790,6 +790,17 @@ trait Level extends Screen with InputProcessor {
             var i = 0
             for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
               spriteRenderer.draw(ladderTexture, pos.x, pos.y+20*i)
+            }
+            spriteRenderer.end()
+          }
+          case Entity.COLLISION_PLAYER => {
+            val spriteRenderer = Main.instance.spriteRenderer
+            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+            val playerTexture = Main.instance.playerTexture
+            spriteRenderer.begin()
+            var i = 0
+            for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
+              spriteRenderer.draw(playerTexture, pos.x, pos.y)
             }
             spriteRenderer.end()
           }
