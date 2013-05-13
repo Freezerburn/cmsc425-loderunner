@@ -123,6 +123,11 @@ trait Level extends Screen with InputProcessor {
     val directionsArr = Array(0, 0)
     for(i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
+      if(ent.collisionType == Entity.COLLISION_PLAYER) {
+        if(ent.position().y < 0)  {
+          Main.instance.nextLevel()
+        }
+      }
       for(j <- 0 to entities.size - 1) {
         val ent2 = entities.get(j)
         if(!(ent.collisionType == Entity.COLLISION_STATIC && ent2.collisionType == Entity.COLLISION_STATIC) &&
@@ -504,7 +509,7 @@ class LevelOne extends Level with CameraFollowsPlayer {
 class LevelTwo extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
-  val WIDTH = 640f
+  val WIDTH = 880f
   val HEIGHT = 640f
 
   def levelSize():Vector2 = {

@@ -135,4 +135,9 @@ class Main extends Game with ApplicationListener {
       Gdx.input.setInputProcessor(currentLevel)
     }
   }
+
+  def gameOver() {
+    setScreen(gameOverLevel)
+    Gdx.input.setInputProcessor(gameOverLevel)
+  }
 }
