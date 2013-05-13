@@ -4,7 +4,6 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.badlogic.gdx.math.{Rectangle, Vector2}
 import com.badlogic.gdx.utils
 import com.badlogic.gdx.utils.{Array => GdxArray}
-import loderunner.{Utils, Main}
 
 object Entity {
   val COLLISION_NONE: Int = 0
@@ -71,6 +70,7 @@ object Player {
   val HEIGHT = 40.0f
   val IGNORE_DELTA = 1.55f
   val GRAVITY = -9.81f * 70.0f
+  val HIT_TIME = 0.13f
 }
 class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
@@ -87,92 +87,105 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   val ladderDeltaTrigger = Player.WIDTH / 3.0f
   val ladderDelta = new Vector2
   var onLadder = false
+  var hit = false
+  var endHit = -1.0f
 
   override def key(keyCode: Int, pressed: Boolean): Boolean = {
     import com.badlogic.gdx.Input.Keys
-    keyCode match {
-      case Keys.LEFT => {
-        pressed match {
-          case true => {
-            log("Moving left")
-            velocity.x -= VEL
-          }
-          case false => {
-            log("Finished moving left")
-            velocity.x += VEL
-          }
-        }
-        true
-      }
-      case Keys.RIGHT => {
-        pressed match {
-          case true => {
-            log("Moving right")
-            velocity.x += VEL
-          }
-          case false => {
-            log("Finished moving right")
-            velocity.x -= VEL
-          }
-        }
-        true
-      }
-      case Keys.SPACE => {
-        if (pressed) {
-          if (!jumping) {
-            log("Jumping")
-            jumping = true
-            velocity.y = JUMP_VEL
-            acceleration.y = Player.GRAVITY
+    if(!hit) {
+      keyCode match {
+        case Keys.LEFT => {
+          pressed match {
+            case true => {
+              log("Moving left")
+              velocity.x -= VEL
+            }
+            case false => {
+              log("Finished moving left")
+              velocity.x += VEL
+            }
           }
           true
         }
-        else {
-          false
-        }
-      }
-      case Keys.UP => {
-        if (pressed) {
-          if (Math.abs(doorDelta.x) > Player.WIDTH / 2.0f) {
-            log("Up pressed with door delta: " + doorDelta.x)
-            if (Main.instance.currentLevel.isGoalMet) {
-              Main.instance.nextLevel()
+        case Keys.RIGHT => {
+          pressed match {
+            case true => {
+              log("Moving right")
+              velocity.x += VEL
+            }
+            case false => {
+              log("Finished moving right")
+              velocity.x -= VEL
             }
           }
-          if(Math.abs(ladderDelta.x) > ladderDeltaTrigger || ladderDelta.y != 0) {
-            log("Up pressed with ladder delta: " + ladderDelta.x)
-            onLadder = true
-            acceleration.y = 0
-            velocity.y = VEL
+          true
+        }
+        case Keys.SPACE => {
+          if (pressed) {
+            if (!jumping) {
+              log("Jumping")
+              jumping = true
+              velocity.y = JUMP_VEL
+              acceleration.y = Player.GRAVITY
+            }
+            true
+          }
+          else {
+            false
           }
         }
-        else {
-          if(onLadder) {
-            velocity.y = 0
+        case Keys.UP => {
+          if (pressed) {
+            if (Math.abs(doorDelta.x) > Player.WIDTH / 2.0f) {
+              log("Up pressed with door delta: " + doorDelta.x)
+              if (Main.instance.currentLevel.isGoalMet) {
+                Main.instance.nextLevel()
+              }
+            }
+            if(Math.abs(ladderDelta.x) > ladderDeltaTrigger || ladderDelta.y != 0) {
+              log("Up pressed with ladder delta: " + ladderDelta.x)
+              onLadder = true
+              acceleration.y = 0
+              velocity.y = VEL
+            }
           }
+          else {
+            if(onLadder) {
+              velocity.y = 0
+            }
+          }
+          true
         }
-        true
+        case Keys.DOWN => {
+          if(pressed) {
+            if(onLadder || ladderDelta.y != 0) {
+              onLadder = true
+              velocity.y = -VEL
+              acceleration.y = 0
+            }
+          }
+          else {
+            if(onLadder) {
+              velocity.y = 0
+            }
+          }
+          true
+        }
+        case _ => false
       }
-      case Keys.DOWN => {
-        if(pressed) {
-          if(onLadder || ladderDelta.y != 0) {
-            onLadder = true
-            velocity.y = -VEL
-            acceleration.y = 0
-          }
-        }
-        else {
-          if(onLadder) {
-            velocity.y = 0
-          }
-        }
-        true
-      }
-      case _ => false
     }
+    false
   }
 
-  def tick(dt: Float) { }
+  def tick(dt: Float) {
+    if(hit) {
+      endHit -= dt
+      if(endHit < 0) {
+        hit = false
+        velocity.set(0, 0)
+      }
+    }
+  }
 
   def position(): Vector2 = new Vector2(rect.getX, rect.getY)
 
@@ -214,8 +227,20 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
           doorDelta.set(vec)
         }
         case Entity.COLLISION_LADDER => {
-          //          ladderDelta.x = if(vec.x == 0) vec.y else vec.x
           ladderDelta.set(vec)
+        }
+        case Entity.COLLISION_ENEMY => {
+          log(collisions.get(i) + ", " + collisionTypes.get(i) + ", " + directions.get(i))
+          if(collisions.get(i).x != 0) {
+            hit = true
+            endHit = Player.HIT_TIME
+            if(directions.get(i)._1 == Entity.COLLISION_LEFT) {
+              velocity.set(200f, 0)
+            }
+            else {
+              velocity.set(-200f, 0)
+            }
+          }
         }
         case _ => Unit
       }
@@ -387,3 +412,42 @@ class Door(x: Float, y: Float) extends Entity {
   def lostCollision(collisionType: Int) {}
 }
 
+object Enemy {
+  val WIDTH = 40.0f
+  val HEIGHT = 20.0f
+}
+class Enemy(x: Float, y: Float) extends Entity with MovingEntity {
+  val rect: Rectangle = new Rectangle(x, y, Enemy.WIDTH, Enemy.HEIGHT)
+  val accelerationScale: Float = 1.0f
+
+  def tick(dt: Float) {}
+
+  def getSprite: TextureRegion = ???
+
+  def key(keyCode: Int, pressed: Boolean): Boolean = false
+
+  def position(): Vector2 = new Vector2(rect.x, rect.y)
+
+  def size(): Vector2 = new Vector2(rect.width, rect.height)
+
+  def rectangle(): Rectangle = new Rectangle(rect)
+
+  def collisionType: Int = Entity.COLLISION_ENEMY
+
+  def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: utils.Array[(Int, Int)]) {
+    for(i <- 0 to collisions.size - 1) {
+      collisionTypes.get(i) match {
+        case Entity.COLLISION_PLAYER => {
+          if(directions.get(i)._2 == Entity.COLLISION_UP && collisions.get(i).y < 0) {
+            Utils.log(collisions + ", " + collisionTypes + ", " + directions)
+            destroy()
+          }
+        }
+        case _ => {
+        }
+      }
+    }
+  }
+
+  def lostCollision(collisionType: Int) {}
+}

@@ -195,6 +195,59 @@ trait Level extends Screen with InputProcessor {
     spriteRenderer.draw(backgroundTexture, 0, 0)
     spriteRenderer.end()
 
+    entities.iterator().foreach((ent) => {
+      val pos = ent.position()
+      val size = ent.size()
+      ent.collisionType match {
+        case Entity.COLLISION_STATIC_FLOOR => {
+          val spriteRenderer = Main.instance.spriteRenderer
+          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+          val boxTexture = Main.instance.boxTexture
+          spriteRenderer.begin()
+          spriteRenderer.draw(boxTexture, pos.x, pos.y)
+          spriteRenderer.end()
+        }
+        case Entity.COLLISION_STATIC => {
+          val spriteRenderer = Main.instance.spriteRenderer
+          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+          val boxTexture = Main.instance.boxTexture
+          spriteRenderer.begin()
+          spriteRenderer.draw(boxTexture, pos.x, pos.y)
+          spriteRenderer.end()
+        }
+        case Entity.COLLISION_TREASURE => {
+          val spriteRenderer = Main.instance.spriteRenderer
+          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+          val treasureTexture = Main.instance.treasureTexture
+          spriteRenderer.begin()
+          spriteRenderer.draw(treasureTexture, pos.x, pos.y)
+          spriteRenderer.end()
+        }
+        case Entity.COLLISION_DOOR => {
+          val spriteRenderer = Main.instance.spriteRenderer
+          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+          val doorTexture = Main.instance.doorTexture
+          spriteRenderer.begin()
+          spriteRenderer.draw(doorTexture, pos.x, pos.y)
+          spriteRenderer.end()
+        }
+        case Entity.COLLISION_LADDER => {
+          val spriteRenderer = Main.instance.spriteRenderer
+          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
+          val ladderTexture = Main.instance.ladderTexture
+          spriteRenderer.begin()
+          var i = 0
+          for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
+            spriteRenderer.draw(ladderTexture, pos.x, pos.y+20*i)
+          }
+          spriteRenderer.end()
+        }
+        case _ => {
+          //            renderer.setColor(Color.WHITE)
+        }
+      }
+    })
+
     if (Main.DEBUG) {
       val renderer = Main.instance.renderer
       renderer.setProjectionMatrix(Main.instance.camera.combined)
@@ -215,6 +268,9 @@ trait Level extends Screen with InputProcessor {
           case Entity.COLLISION_LADDER => {
             renderer.setColor(Color.PINK)
           }
+          case Entity.COLLISION_ENEMY => {
+            renderer.setColor(Color.GREEN)
+          }
           case _ => {
             renderer.setColor(Color.BLACK)
           }
@@ -222,59 +278,6 @@ trait Level extends Screen with InputProcessor {
         renderer.rect(pos.x, pos.y, size.x, size.y)
       })
       renderer.end()
-
-      entities.iterator().foreach((ent) => {
-        val pos = ent.position()
-        val size = ent.size()
-        ent.collisionType match {
-          case Entity.COLLISION_STATIC_FLOOR => {
-            val spriteRenderer = Main.instance.spriteRenderer
-            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val boxTexture = Main.instance.boxTexture
-            spriteRenderer.begin()
-            spriteRenderer.draw(boxTexture, pos.x, pos.y)
-            spriteRenderer.end()
-          }
-          case Entity.COLLISION_STATIC => {
-            val spriteRenderer = Main.instance.spriteRenderer
-            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val boxTexture = Main.instance.boxTexture
-            spriteRenderer.begin()
-            spriteRenderer.draw(boxTexture, pos.x, pos.y)
-            spriteRenderer.end()
-          }
-          case Entity.COLLISION_TREASURE => {
-            val spriteRenderer = Main.instance.spriteRenderer
-            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val treasureTexture = Main.instance.treasureTexture
-            spriteRenderer.begin()
-            spriteRenderer.draw(treasureTexture, pos.x, pos.y)
-            spriteRenderer.end()
-          }
-          case Entity.COLLISION_DOOR => {
-            val spriteRenderer = Main.instance.spriteRenderer
-            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val doorTexture = Main.instance.doorTexture
-            spriteRenderer.begin()
-            spriteRenderer.draw(doorTexture, pos.x, pos.y)
-            spriteRenderer.end()
-          }
-          case Entity.COLLISION_LADDER => {
-            val spriteRenderer = Main.instance.spriteRenderer
-            spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-            val ladderTexture = Main.instance.ladderTexture
-            spriteRenderer.begin()
-            var i = 0
-            for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
-              spriteRenderer.draw(ladderTexture, pos.x, pos.y+20*i)
-            }
-            spriteRenderer.end()
-          }
-          case _ => {
-            //            renderer.setColor(Color.WHITE)
-          }
-        }
-      })
 
       if (fpslogger != null) {
         fpslogger.log()
@@ -483,6 +486,8 @@ class LevelOne extends Level with CameraFollowsPlayer {
     entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
 
     entities.add(new Treasure(150,150))
+
+    entities.add(new Enemy(BLOCK_SIZE * 6, BLOCK_SIZE))
   }
 
   def hide() {}
