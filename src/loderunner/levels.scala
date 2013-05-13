@@ -462,7 +462,8 @@ trait CameraFollowsPlayer {
 class LevelOne extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
-  val WIDTH = 880f
+  val NUM_FLOOR_BLOCKS = 23
+  val WIDTH = BLOCK_SIZE * NUM_FLOOR_BLOCKS
   val HEIGHT = 480f
 
   def levelSize():Vector2 = {
@@ -477,12 +478,21 @@ class LevelOne extends Level with CameraFollowsPlayer {
     player = new Player(BLOCK_SIZE * 2, BLOCK_SIZE)
     entities.add(player)
 
-    for (i <- 0 to 100) {
+    for (i <- 0 to NUM_FLOOR_BLOCKS) {
       entities.add(new StaticBlock(BLOCK_SIZE * i, 0, BLOCK_SIZE, BLOCK_SIZE, true))
-      entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE, false))
+      if(i > 0) {
+        entities.add(new StaticBlock(0, BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE, false))
+        entities.add(new StaticBlock(BLOCK_SIZE * (NUM_FLOOR_BLOCKS - 1), BLOCK_SIZE * i, BLOCK_SIZE, BLOCK_SIZE, false))
+      }
     }
+
     entities.add(new StaticBlock(BLOCK_SIZE * 4, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
+    entities.add(new StaticBlock(BLOCK_SIZE * 5, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
+    entities.add(new StaticBlock(BLOCK_SIZE * 6, BLOCK_SIZE * 2, BLOCK_SIZE, BLOCK_SIZE, false))
+
     entities.add(new Ladder(BLOCK_SIZE * 4, BLOCK_SIZE))
+    entities.add(new Ladder(BLOCK_SIZE * 6, BLOCK_SIZE * 3))
+
     entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
 
     entities.add(new Treasure(150,150))

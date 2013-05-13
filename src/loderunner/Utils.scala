@@ -4,6 +4,7 @@ import com.badlogic.gdx.{ApplicationListener, Gdx}
 import com.badlogic.gdx.graphics.{FPSLogger, Texture}
 import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.backends.lwjgl.{LwjglApplication, LwjglApplicationConfiguration}
+import scala.util.Random
 
 /**
  * Created with IntelliJ IDEA.
@@ -17,6 +18,8 @@ object Utils {
   var numLogs = 0
   val GC_AFTER = 60
   val GC_TIMES = 3
+
+  val rand = new Random()
 
   def newGame(game: ApplicationListener, width: Int, height: Int) {
     val config = new LwjglApplicationConfiguration

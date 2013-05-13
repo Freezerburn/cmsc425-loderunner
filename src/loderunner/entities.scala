@@ -415,12 +415,37 @@ class Door(x: Float, y: Float) extends Entity {
 object Enemy {
   val WIDTH = 40.0f
   val HEIGHT = 20.0f
+  val VELOCITY = 100.0f
+  val LADDER_COOLDOWN = 3.0f
 }
 class Enemy(x: Float, y: Float) extends Entity with MovingEntity {
   val rect: Rectangle = new Rectangle(x, y, Enemy.WIDTH, Enemy.HEIGHT)
   val accelerationScale: Float = 1.0f
 
-  def tick(dt: Float) {}
+  var onLadder = false
+  var ladderCollision = false
+  var madeLadderDecision = false
+  var startLadderCollision = 0.0f
+  var ladderCollisionCooldown = 0.0f
+  var numStatics = 0
+
+  if(Math.abs(Utils.rand.nextInt(100)) < 49) {
+    velocity.set(Enemy.VELOCITY, 0)
+  }
+  else {
+    velocity.set(-Enemy.VELOCITY, 0)
+  }
+
+  def tick(dt: Float) {
+    ladderCollisionCooldown -= dt
+    if(!madeLadderDecision && ladderCollision && !onLadder && Math.abs(rect.x - startLadderCollision) > rect.width / 2.0f + 10.0f) {
+      madeLadderDecision = true
+      if(Math.abs(Utils.rand.nextInt(100)) < 49) {
+        onLadder = true
+        velocity.set(0, Enemy.VELOCITY)
+      }
+    }
+  }
 
   def getSprite: TextureRegion = ???
 
@@ -435,6 +460,7 @@ class Enemy(x: Float, y: Float) extends Entity with MovingEntity {
   def collisionType: Int = Entity.COLLISION_ENEMY
 
   def onCollision(collisions: utils.Array[Vector2], collisionTypes: utils.Array[Int], directions: utils.Array[(Int, Int)]) {
+    var curStatics = 0
     for(i <- 0 to collisions.size - 1) {
       collisionTypes.get(i) match {
         case Entity.COLLISION_PLAYER => {
@@ -443,11 +469,68 @@ class Enemy(x: Float, y: Float) extends Entity with MovingEntity {
             destroy()
           }
         }
+        case Entity.COLLISION_LADDER => {
+          if(!ladderCollision && ladderCollisionCooldown < 0) {
+            ladderCollision = true
+            startLadderCollision = rect.x
+          }
+        }
+        case Entity.COLLISION_STATIC | Entity.COLLISION_STATIC_FLOOR => {
+          if(collisions.get(i).x != 0) {
+            velocity.set(-velocity.x, 0)
+          }
+          else if(!onLadder) {
+            if(numStatics == 0) {
+              Utils.log("foo?")
+              numStatics = 1
+              move(collisions.get(i).x, collisions.get(i).y)
+              acceleration.y = 0
+              velocity.y = 0
+
+              if(Math.abs(Utils.rand.nextInt(100)) < 49) {
+                velocity.set(Enemy.VELOCITY, 0)
+              }
+              else {
+                velocity.set(-Enemy.VELOCITY, 0)
+              }
+            }
+          }
+          curStatics += 1
+        }
         case _ => {
         }
       }
     }
+    numStatics = curStatics
   }
 
-  def lostCollision(collisionType: Int) {}
+  def lostCollision(collisionType: Int) {
+    collisionType match {
+      case Entity.COLLISION_LADDER => {
+        if(ladderCollision) {
+          ladderCollision = false
+          madeLadderDecision = false
+        }
+        if(onLadder) {
+          onLadder = false
+          ladderCollisionCooldown = Enemy.LADDER_COOLDOWN
+          move(0, -Main.BLOCK_SIZE / 10.0f - Enemy.VELOCITY * Main.instance.worldStep)
+          if(Math.abs(Utils.rand.nextInt(100)) < 49) {
+            velocity.set(Enemy.VELOCITY, 0)
+          }
+          else {
+            velocity.set(-Enemy.VELOCITY, 0)
+          }
+        }
+      }
+      case Entity.COLLISION_STATIC | Entity.COLLISION_STATIC_FLOOR => {
+        numStatics -= 1
+        if(numStatics == 0 && !onLadder) {
+          acceleration.y = Player.GRAVITY
+        }
+      }
+      case _ => {
+      }
+    }
+  }
 }
