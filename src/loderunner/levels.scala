@@ -15,6 +15,7 @@ trait Level extends Screen with InputProcessor {
   val addLater = new GdxArray[Entity]()
   val removeLater = new GdxArray[Entity]()
   var fpslogger: FPSLogger = null
+  var font: BitmapFont = null
 
   def isGoalMet: Boolean
 
@@ -121,6 +122,8 @@ trait Level extends Screen with InputProcessor {
     val collidingType = new GdxArray[Int]
     val directions = new GdxArray[(Int, Int)]
     val directionsArr = Array(0, 0)
+    font = new BitmapFont()
+    font.setColor(0.5f,0.4f,0,1)
     for(i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
       if(ent.collisionType == Entity.COLLISION_PLAYER) {
@@ -195,11 +198,8 @@ trait Level extends Screen with InputProcessor {
     //    Main.instance.camera.apply(Gdx.graphics.getGL10)
 
     val spriteRenderer = Main.instance.spriteRenderer
-    val backgroundTexture = Main.instance.backgroundTexture
-    spriteRenderer.begin()
-    spriteRenderer.draw(backgroundTexture, 0, 0)
-    spriteRenderer.end()
 
+    val backgroundTexture = Main.instance.backgroundTexture
     val boxTexture = Main.instance.boxTexture
     val treasureTexture = Main.instance.treasureTexture
     val doorTexture = Main.instance.doorTexture
@@ -207,6 +207,9 @@ trait Level extends Screen with InputProcessor {
 
     spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
     spriteRenderer.begin()
+    spriteRenderer.draw(backgroundTexture, 0, 0)
+    font.draw(spriteRenderer, "Score: 0" + Main.instance.score, 700, 600)
+
     entities.iterator().foreach((ent) => {
       val pos = ent.position()
       val size = ent.size()
@@ -547,7 +550,6 @@ class LevelTwo extends Level with CameraFollowsPlayer {
 
 class GameOver extends Level {
   val QUIT_AFTER = 2.0f
-  var font: BitmapFont = null
   var time: Float = 0
 
   def levelSize():Vector2 = {
