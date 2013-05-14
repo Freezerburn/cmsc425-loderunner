@@ -235,10 +235,18 @@ trait Level extends Screen with InputProcessor {
         case Entity.COLLISION_PLAYER => {
           val player:Player = ent.asInstanceOf[Player]
           var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
-          if(player.state == (Player.State.WALKING)) {
+          if(player.onLadder) {
+            frame = Main.instance.playerClimbAnimation.getKeyFrame(player.stateTime, true)
+            spriteRenderer.draw(frame, pos.x, pos.y)
+          } else if(player.state == (Player.State.WALKING)) {
             frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
+            spriteRenderer.draw(frame, pos.x, pos.y)
+          } else if(player.state == (Player.State.JUMPING)) {
+            val jumpingTexture = Main.instance.playerJumpingTexture
+            spriteRenderer.draw(jumpingTexture, pos.x, pos.y)
+          } else {
+            spriteRenderer.draw(frame, pos.x, pos.y)
           }
-          spriteRenderer.draw(frame, pos.x, pos.y)
         }
         case _ => {
           //            renderer.setColor(Color.WHITE)
