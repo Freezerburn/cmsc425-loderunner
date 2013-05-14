@@ -112,10 +112,10 @@ class Main extends Game with ApplicationListener {
     playerIdleLeftRegion = new TextureRegion(playerIdleTexture)
     playerIdleRightRegion = new TextureRegion(playerIdleTexture)
     playerIdleRightRegion.flip(true, false)
-    playerWalkLeftRegions = playerWalkTextures.map((tex) => {
+    playerWalkRightRegions = playerWalkTextures.map((tex) => {
       new TextureRegion(tex)
     })
-    playerWalkRightRegions = playerWalkTextures.map((tex) => {
+    playerWalkLeftRegions = playerWalkTextures.map((tex) => {
       val ret = new TextureRegion(tex)
       ret.flip(true, false)
       ret
