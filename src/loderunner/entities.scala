@@ -66,11 +66,17 @@ trait MovingEntity {
 }
 
 object Player {
+  object State extends Enumeration {
+    type State = Value
+    val IDLE, WALKING, JUMPING, DYING = Value
+  }
+
   val WIDTH = 20.0f
   val HEIGHT = 40.0f
   val IGNORE_DELTA = 1.55f
   val GRAVITY = -9.81f * 70.0f
   val HIT_TIME = 0.13f
+  val SIZE = 0.5f
 }
 class Player(x: Float, y: Float) extends Entity with MovingEntity {
 
@@ -90,6 +96,10 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   var hit = false
   var endHit = -1.0f
 
+  var state = Player.State.IDLE
+  var facingLeft = false
+  var stateTime = 0.0f
+
   override def key(keyCode: Int, pressed: Boolean): Boolean = {
     import com.badlogic.gdx.Input.Keys
     if(!hit) {
@@ -99,10 +109,13 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
             case true => {
               log("Moving left")
               velocity.x -= VEL
+              facingLeft = true
+              state = Player.State.WALKING
             }
             case false => {
               log("Finished moving left")
               velocity.x += VEL
+              state = Player.State.IDLE
             }
           }
           true
@@ -112,10 +125,13 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
             case true => {
               log("Moving right")
               velocity.x += VEL
+              facingLeft = false
+              state = Player.State.WALKING
             }
             case false => {
               log("Finished moving right")
               velocity.x -= VEL
+              state = Player.State.IDLE
             }
           }
           true
@@ -178,6 +194,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   }
 
   def tick(dt: Float) {
+    stateTime += dt
     if(hit) {
       endHit -= dt
       if(endHit < 0) {

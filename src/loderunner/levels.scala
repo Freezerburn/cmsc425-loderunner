@@ -15,6 +15,7 @@ trait Level extends Screen with InputProcessor {
   val addLater = new GdxArray[Entity]()
   val removeLater = new GdxArray[Entity]()
   var fpslogger: FPSLogger = null
+  var font: BitmapFont = null
 
   def isGoalMet: Boolean
 
@@ -121,8 +122,15 @@ trait Level extends Screen with InputProcessor {
     val collidingType = new GdxArray[Int]
     val directions = new GdxArray[(Int, Int)]
     val directionsArr = Array(0, 0)
+    font = new BitmapFont()
+    font.setColor(0.5f,0.4f,0,1)
     for(i <- 0 to entities.size - 1) {
       val ent = entities.get(i)
+      if(ent.collisionType == Entity.COLLISION_PLAYER) {
+        if(ent.position().y < 0)  {
+          Main.instance.nextLevel()
+        }
+      }
       for(j <- 0 to entities.size - 1) {
         val ent2 = entities.get(j)
         if(!(ent.collisionType == Entity.COLLISION_STATIC && ent2.collisionType == Entity.COLLISION_STATIC) &&
@@ -190,63 +198,54 @@ trait Level extends Screen with InputProcessor {
     //    Main.instance.camera.apply(Gdx.graphics.getGL10)
 
     val spriteRenderer = Main.instance.spriteRenderer
+
     val backgroundTexture = Main.instance.backgroundTexture
+    val boxTexture = Main.instance.boxTexture
+    val treasureTexture = Main.instance.treasureTexture
+    val doorTexture = Main.instance.doorTexture
+    val ladderTexture = Main.instance.ladderTexture
+
+    spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
     spriteRenderer.begin()
     spriteRenderer.draw(backgroundTexture, 0, 0)
-    spriteRenderer.end()
+    font.draw(spriteRenderer, "Score: 0" + Main.instance.score, 700, 600)
 
     entities.iterator().foreach((ent) => {
       val pos = ent.position()
       val size = ent.size()
       ent.collisionType match {
         case Entity.COLLISION_STATIC_FLOOR => {
-          val spriteRenderer = Main.instance.spriteRenderer
-          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-          val boxTexture = Main.instance.boxTexture
-          spriteRenderer.begin()
           spriteRenderer.draw(boxTexture, pos.x, pos.y)
-          spriteRenderer.end()
         }
         case Entity.COLLISION_STATIC => {
-          val spriteRenderer = Main.instance.spriteRenderer
-          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-          val boxTexture = Main.instance.boxTexture
-          spriteRenderer.begin()
           spriteRenderer.draw(boxTexture, pos.x, pos.y)
-          spriteRenderer.end()
         }
         case Entity.COLLISION_TREASURE => {
-          val spriteRenderer = Main.instance.spriteRenderer
-          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-          val treasureTexture = Main.instance.treasureTexture
-          spriteRenderer.begin()
           spriteRenderer.draw(treasureTexture, pos.x, pos.y)
-          spriteRenderer.end()
         }
         case Entity.COLLISION_DOOR => {
-          val spriteRenderer = Main.instance.spriteRenderer
-          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-          val doorTexture = Main.instance.doorTexture
-          spriteRenderer.begin()
           spriteRenderer.draw(doorTexture, pos.x, pos.y)
-          spriteRenderer.end()
         }
         case Entity.COLLISION_LADDER => {
-          val spriteRenderer = Main.instance.spriteRenderer
-          spriteRenderer.setProjectionMatrix(Main.instance.camera.combined)
-          val ladderTexture = Main.instance.ladderTexture
-          spriteRenderer.begin()
           var i = 0
           for (i <- 0 to (Ladder.HEIGHT/20.0).toInt) {
             spriteRenderer.draw(ladderTexture, pos.x, pos.y+20*i)
           }
-          spriteRenderer.end()
+        }
+        case Entity.COLLISION_PLAYER => {
+          val player:Player = ent.asInstanceOf[Player]
+          var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
+          if(player.state == (Player.State.WALKING)) {
+            frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
+          }
+          spriteRenderer.draw(frame, pos.x, pos.y)
         }
         case _ => {
           //            renderer.setColor(Color.WHITE)
         }
       }
     })
+    spriteRenderer.end()
 
     if (Main.DEBUG) {
       val renderer = Main.instance.renderer
@@ -514,7 +513,7 @@ class LevelOne extends Level with CameraFollowsPlayer {
 class LevelTwo extends Level with CameraFollowsPlayer {
   import Main.BLOCK_SIZE
   var player: Player = null
-  val WIDTH = 640f
+  val WIDTH = 880f
   val HEIGHT = 640f
 
   def levelSize():Vector2 = {
@@ -561,7 +560,6 @@ class LevelTwo extends Level with CameraFollowsPlayer {
 
 class GameOver extends Level {
   val QUIT_AFTER = 2.0f
-  var font: BitmapFont = null
   var time: Float = 0
 
   def levelSize():Vector2 = {

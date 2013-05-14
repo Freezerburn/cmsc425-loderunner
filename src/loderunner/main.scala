@@ -7,7 +7,7 @@ import com.badlogic.gdx.utils.GdxNativesLoader
 import com.badlogic.gdx.utils.{Array => GdxArray}
 
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import com.badlogic.gdx.graphics.g2d.{SpriteBatch, BitmapFont, TextureRegion}
+import com.badlogic.gdx.graphics.g2d.{Animation, SpriteBatch, BitmapFont, TextureRegion}
 
 /**
  * Created with IntelliJ IDEA.
@@ -26,6 +26,10 @@ object Main {
   val DEBUG = true
 
   val BLOCK_SIZE = Player.HEIGHT
+
+  val CADENCE = 180
+  val NUM_FRAMES = 2
+  val RUNNING_FRAME_DURATION: Float = 1.0f / (CADENCE / 60.0f * NUM_FRAMES)
 
   var instance: Main = null
 
@@ -70,6 +74,16 @@ class Main extends Game with ApplicationListener {
   var ladderTexture: Texture = null
   var backgroundTexture: Texture = null
 
+  var playerIdleTexture: Texture = null
+  var playerWalkTextures: Array[Texture] = null
+
+  var playerIdleLeftRegion: TextureRegion = null
+  var playerIdleRightRegion: TextureRegion = null
+  var playerWalkLeftRegions: Array[TextureRegion] = null
+  var playerWalkRightRegions: Array[TextureRegion] = null
+  var playerWalkLeftAnimation: Animation = null
+  var playerWalkRightAnimation: Animation = null
+
   var score: Long = 0L
   var scoreMultiplier: Float = 1.0f
 
@@ -90,6 +104,26 @@ class Main extends Game with ApplicationListener {
     doorTexture = new Texture(Gdx.files.internal("assets/door.png"))
     ladderTexture = new Texture(Gdx.files.internal("assets/ladder.png"))
     backgroundTexture = new Texture(Gdx.files.internal("assets/background.png"))
+
+    playerIdleTexture = new Texture(Gdx.files.internal("assets/player01.png"))
+    playerWalkTextures = 2.to(3).foldLeft(Array[Texture]())((arr, i) => {
+      arr :+ new Texture(Gdx.files.internal("assets/player0" + i + ".png"))
+    })
+    playerIdleLeftRegion = new TextureRegion(playerIdleTexture)
+    playerIdleRightRegion = new TextureRegion(playerIdleTexture)
+    playerIdleRightRegion.flip(true, false)
+    playerWalkRightRegions = playerWalkTextures.map((tex) => {
+      new TextureRegion(tex)
+    })
+    playerWalkLeftRegions = playerWalkTextures.map((tex) => {
+      val ret = new TextureRegion(tex)
+      ret.flip(true, false)
+      ret
+    })
+    import com.badlogic.gdx.utils.{Array => GdxArray}
+    playerWalkLeftAnimation = new Animation(Main.RUNNING_FRAME_DURATION, new GdxArray[TextureRegion](playerWalkLeftRegions))
+    playerWalkRightAnimation = new Animation(Main.RUNNING_FRAME_DURATION, new GdxArray[TextureRegion](playerWalkRightRegions))
+
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))
     import com.badlogic.gdx.graphics.GL10
@@ -134,5 +168,10 @@ class Main extends Game with ApplicationListener {
       setScreen(currentLevel)
       Gdx.input.setInputProcessor(currentLevel)
     }
+  }
+
+  def gameOver() {
+    setScreen(gameOverLevel)
+    Gdx.input.setInputProcessor(gameOverLevel)
   }
 }
