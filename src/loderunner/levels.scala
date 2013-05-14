@@ -210,6 +210,9 @@ trait Level extends Screen with InputProcessor {
     spriteRenderer.draw(backgroundTexture, 0, 0)
     font.draw(spriteRenderer, "Score: 0" + Main.instance.score, 700, 600)
 
+    var player: Player = null
+    var playerPos: Vector2 = null
+    var playerSize: Vector2 = null
     entities.iterator().foreach((ent) => {
       val pos = ent.position()
       val size = ent.size()
@@ -233,26 +236,28 @@ trait Level extends Screen with InputProcessor {
           }
         }
         case Entity.COLLISION_PLAYER => {
-          val player:Player = ent.asInstanceOf[Player]
-          var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
-          if(player.onLadder) {
-            frame = Main.instance.playerClimbAnimation.getKeyFrame(player.stateTime, true)
-            spriteRenderer.draw(frame, pos.x, pos.y)
-          } else if(player.state == (Player.State.WALKING)) {
-            frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
-            spriteRenderer.draw(frame, pos.x, pos.y)
-          } else if(player.state == (Player.State.JUMPING)) {
-            val jumpingTexture = Main.instance.playerJumpingTexture
-            spriteRenderer.draw(jumpingTexture, pos.x, pos.y)
-          } else {
-            spriteRenderer.draw(frame, pos.x, pos.y)
-          }
+          player = ent.asInstanceOf[Player]
+          playerPos = pos
+          playerSize = size
         }
         case _ => {
           //            renderer.setColor(Color.WHITE)
         }
       }
     })
+    var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
+    if(player.onLadder) {
+      frame = Main.instance.playerClimbAnimation.getKeyFrame(player.stateTime, true)
+      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+    } else if(player.state == (Player.State.WALKING)) {
+      frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
+      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+    } else if(player.state == (Player.State.JUMPING)) {
+      val jumpingTexture = Main.instance.playerJumpingTexture
+      spriteRenderer.draw(jumpingTexture, playerPos.x, playerPos.y)
+    } else {
+      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+    }
     spriteRenderer.end()
 
     if (Main.DEBUG) {
