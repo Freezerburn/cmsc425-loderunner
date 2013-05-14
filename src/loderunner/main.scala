@@ -75,14 +75,18 @@ class Main extends Game with ApplicationListener {
   var backgroundTexture: Texture = null
 
   var playerIdleTexture: Texture = null
+  var playerJumpingTexture: Texture = null
   var playerWalkTextures: Array[Texture] = null
+  var playerClimbTextures: Array[Texture] = null
 
   var playerIdleLeftRegion: TextureRegion = null
   var playerIdleRightRegion: TextureRegion = null
   var playerWalkLeftRegions: Array[TextureRegion] = null
   var playerWalkRightRegions: Array[TextureRegion] = null
+  var playerClimbRegions: Array[TextureRegion] = null
   var playerWalkLeftAnimation: Animation = null
   var playerWalkRightAnimation: Animation = null
+  var playerClimbAnimation: Animation = null
 
   var score: Long = 0L
   var scoreMultiplier: Float = 1.0f
@@ -106,8 +110,12 @@ class Main extends Game with ApplicationListener {
     backgroundTexture = new Texture(Gdx.files.internal("assets/background.png"))
 
     playerIdleTexture = new Texture(Gdx.files.internal("assets/player01.png"))
+    playerJumpingTexture = new Texture(Gdx.files.internal("assets/jumping.png"))
     playerWalkTextures = 2.to(3).foldLeft(Array[Texture]())((arr, i) => {
       arr :+ new Texture(Gdx.files.internal("assets/player0" + i + ".png"))
+    })
+    playerClimbTextures = 1.to(2).foldLeft(Array[Texture]())((arr, i) => {
+      arr :+ new Texture(Gdx.files.internal("assets/climbing0" + i + ".png"))
     })
     playerIdleLeftRegion = new TextureRegion(playerIdleTexture)
     playerIdleRightRegion = new TextureRegion(playerIdleTexture)
@@ -120,9 +128,13 @@ class Main extends Game with ApplicationListener {
       ret.flip(true, false)
       ret
     })
+    playerClimbRegions = playerClimbTextures.map((tex) => {
+      new TextureRegion(tex)
+    })
     import com.badlogic.gdx.utils.{Array => GdxArray}
     playerWalkLeftAnimation = new Animation(Main.RUNNING_FRAME_DURATION, new GdxArray[TextureRegion](playerWalkLeftRegions))
     playerWalkRightAnimation = new Animation(Main.RUNNING_FRAME_DURATION, new GdxArray[TextureRegion](playerWalkRightRegions))
+    playerClimbAnimation = new Animation(Main.RUNNING_FRAME_DURATION, new GdxArray[TextureRegion](playerClimbRegions))
 
 
     log("Setting clear color: %.2f %.2f %.2f".format(clearColor(0), clearColor(1), clearColor(2)))

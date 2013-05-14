@@ -68,7 +68,7 @@ trait MovingEntity {
 object Player {
   object State extends Enumeration {
     type State = Value
-    val IDLE, WALKING, JUMPING, DYING = Value
+    val IDLE, WALKING, JUMPING, DYING, CLIMBING = Value
   }
 
   val WIDTH = 20.0f
@@ -141,6 +141,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
             if (!jumping) {
               log("Jumping")
               jumping = true
+              state = Player.State.JUMPING
               velocity.y = JUMP_VEL
               acceleration.y = Player.GRAVITY
             }
@@ -148,6 +149,7 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
           }
           else {
             false
+            state = Player.State.IDLE
           }
         }
         case Keys.UP => {
