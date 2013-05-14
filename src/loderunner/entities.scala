@@ -90,6 +90,9 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
   val accelerationScale: Float = 1
   val doorDelta = new Vector2
 
+  var health = 2
+  var ignoreNextUp = false
+
   val ladderDeltaTrigger = Player.WIDTH / 3.0f
   val ladderDelta = new Vector2
   var onLadder = false
@@ -253,11 +256,18 @@ class Player(x: Float, y: Float) extends Entity with MovingEntity {
           if(collisions.get(i).x != 0) {
             hit = true
             endHit = Player.HIT_TIME
-            if(directions.get(i)._1 == Entity.COLLISION_LEFT) {
-              velocity.set(200f, 0)
+            health -= 1
+            if(health == 0) {
+              destroy()
+              Main.instance.gameOver()
             }
             else {
-              velocity.set(-200f, 0)
+              if(directions.get(i)._1 == Entity.COLLISION_LEFT) {
+                velocity.set(200f, 0)
+              }
+              else {
+                velocity.set(-200f, 0)
+              }
             }
           }
         }
@@ -448,12 +458,13 @@ class Enemy(x: Float, y: Float) extends Entity with MovingEntity {
   var ladderCollisionCooldown = 0.0f
   var numStatics = 0
 
-  if(Math.abs(Utils.rand.nextInt(100)) < 49) {
-    velocity.set(Enemy.VELOCITY, 0)
-  }
-  else {
-    velocity.set(-Enemy.VELOCITY, 0)
-  }
+//  if(Math.abs(Utils.rand.nextInt(100)) < 49) {
+//    velocity.set(Enemy.VELOCITY, 0)
+//  }
+//  else {
+//    velocity.set(-Enemy.VELOCITY, 0)
+//  }
+  velocity.set(-Enemy.VELOCITY, 0)
 
   def tick(dt: Float) {
     ladderCollisionCooldown -= dt

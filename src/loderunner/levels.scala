@@ -245,56 +245,60 @@ trait Level extends Screen with InputProcessor {
         }
       }
     })
-    var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
-    if(player.onLadder) {
-      frame = Main.instance.playerClimbAnimation.getKeyFrame(player.stateTime, true)
-      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
-    } else if(player.state == (Player.State.WALKING)) {
-      frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
-      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
-    } else if(player.state == (Player.State.JUMPING)) {
-      val jumpingTexture = Main.instance.playerJumpingTexture
-      spriteRenderer.draw(jumpingTexture, playerPos.x, playerPos.y)
-    } else {
-      spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+    if(player != null) {
+      var frame = if(player.facingLeft) Main.instance.playerIdleLeftRegion else Main.instance.playerIdleRightRegion
+      if(player.onLadder) {
+        frame = Main.instance.playerClimbAnimation.getKeyFrame(player.stateTime, true)
+        spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+      } else if(player.state == (Player.State.WALKING)) {
+        frame = if(player.facingLeft) Main.instance.playerWalkLeftAnimation.getKeyFrame(player.stateTime, true) else Main.instance.playerWalkRightAnimation.getKeyFrame(player.stateTime, true)
+        spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+      } else if(player.state == (Player.State.JUMPING)) {
+        val jumpingTexture = Main.instance.playerJumpingTexture
+        spriteRenderer.draw(jumpingTexture, playerPos.x, playerPos.y)
+      } else {
+        spriteRenderer.draw(frame, playerPos.x, playerPos.y)
+      }
     }
     spriteRenderer.end()
 
-    if (Main.DEBUG) {
-      val renderer = Main.instance.renderer
-      renderer.setProjectionMatrix(Main.instance.camera.combined)
-      renderer.begin(ShapeRenderer.ShapeType.Rectangle)
-      entities.iterator().foreach((ent) => {
-        val pos = ent.position()
-        val size = ent.size()
-        ent.collisionType match {
-          case Entity.COLLISION_PLAYER => {
-            renderer.setColor(Color.RED)
-          }
-          case Entity.COLLISION_TREASURE => {
-            renderer.setColor(Color.CLEAR)
-          }
-          case Entity.COLLISION_DOOR => {
-            renderer.setColor(Color.CLEAR)
-          }
-          case Entity.COLLISION_LADDER => {
-            renderer.setColor(Color.PINK)
-          }
-          case Entity.COLLISION_ENEMY => {
-            renderer.setColor(Color.GREEN)
-          }
-          case _ => {
-            renderer.setColor(Color.BLACK)
-          }
+//    if (Main.DEBUG) {
+    val renderer = Main.instance.renderer
+    renderer.setProjectionMatrix(Main.instance.camera.combined)
+    renderer.begin(ShapeRenderer.ShapeType.Rectangle)
+    entities.iterator().foreach((ent) => {
+      val pos = ent.position()
+      val size = ent.size()
+      ent.collisionType match {
+        case Entity.COLLISION_PLAYER => {
+          renderer.setColor(Color.RED)
         }
-        renderer.rect(pos.x, pos.y, size.x, size.y)
-      })
-      renderer.end()
-
-      if (fpslogger != null) {
-        fpslogger.log()
+        case Entity.COLLISION_TREASURE => {
+          renderer.setColor(Color.CLEAR)
+        }
+        case Entity.COLLISION_DOOR => {
+          renderer.setColor(Color.CLEAR)
+        }
+        case Entity.COLLISION_LADDER => {
+          renderer.setColor(Color.PINK)
+        }
+        case Entity.COLLISION_ENEMY => {
+          renderer.setColor(Color.GREEN)
+        }
+        case _ => {
+          renderer.setColor(Color.BLACK)
+        }
       }
+      if(Main.DEBUG || ent.collisionType == Entity.COLLISION_ENEMY) {
+        renderer.rect(pos.x, pos.y, size.x, size.y)
+      }
+    })
+    renderer.end()
+
+    if (fpslogger != null) {
+      fpslogger.log()
     }
+//  }
   }
 
   def keyTyped(character: Char): Boolean = {

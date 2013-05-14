@@ -23,7 +23,7 @@ object Main {
   val WIDTH = 640
   val HEIGHT = 480
 
-  val DEBUG = true
+  val DEBUG = false
 
   val BLOCK_SIZE = Player.HEIGHT
 
