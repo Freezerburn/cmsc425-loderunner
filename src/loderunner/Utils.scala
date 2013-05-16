@@ -29,6 +29,7 @@ object Utils {
     config.height = height
     config.resizable = false
     config.vSyncEnabled = true
+    config.fullscreen = true
     new LwjglApplication(game, config)
   }
 

@@ -512,6 +512,7 @@ class LevelOne extends Level with CameraFollowsPlayer {
     entities.add(new Door(BLOCK_SIZE * 10, BLOCK_SIZE))
 
     entities.add(new Treasure(150,150))
+    entities.add(new Treasure(BLOCK_SIZE * 6, BLOCK_SIZE * 5))
 
     entities.add(new Enemy(BLOCK_SIZE * 6, BLOCK_SIZE))
   }
@@ -562,6 +563,8 @@ class LevelTwo extends Level with CameraFollowsPlayer {
 
     entities.add(new Ladder(BLOCK_SIZE * 10, BLOCK_SIZE))
     entities.add(new Door(BLOCK_SIZE * 16, BLOCK_SIZE*2))
+
+    entities.add(new Treasure(BLOCK_SIZE * 10, BLOCK_SIZE * 4))
   }
 
   def hide() {}
